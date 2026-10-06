@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Aplikasi Asesmen Narapidana - IKP-R Detail</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <style>
+    .form-label { font-weight: 600; font-size: 0.9rem; margin-top: 10px; }
+    .section-title { background: #0D3B66; color: white; padding: 8px 15px; border-radius: 4px; margin-top: 25px; }
+    .table-radio td { text-align: center; vertical-align: middle; }
+    .table-radio th { font-size: 0.9rem; }
+  </style>
+</head>
+<body class="bg-light">
+
+<!-- DIV LOGIN -->
+<div class="container py-5" id="loginSection" style="max-width: 400px;">
+  <div class="card shadow">
+    <div class="card-header bg-primary text-white text-center"><h5>Login Asesor</h5></div>
+    <div class="card-body">
+      <form id="formLogin">
+        <input type="text" id="username" class="form-control mb-2" placeholder="Username" required>
+        <input type="password" id="password" class="form-control mb-3" placeholder="Password" required>
+        <button type="button" class="btn btn-primary w-100" onclick="doLogin()">Masuk</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- DIV APLIKASI UTAMA -->
+<div class="container-fluid py-3 px-4" id="appSection" style="display:none;">
+  <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+    <h4>Instrumen IKP-R Detail Lengkap</h4>
+    <div>
+      <span id="userInfo" class="badge bg-secondary me-2"></span>
+      <button class="btn btn-sm btn-outline-danger" onclick="location.reload()">Keluar</button>
+    </div>
+  </div>
+
+  <form id="formAsesmen">
+    <!-- NAV TABS -->
+    <ul class="nav nav-tabs">
+      <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab0" type="button">Identitas & M0</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab1" type="button">Modul 1</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab2" type="button">Modul 2 & 3</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab4" type="button">Modul 4</button></li>
+      <li class="nav-item"><button class="nav-link text-success fw-bold" data-bs-toggle="tab" data-bs-target="#tab5" type="button">Rekap & Submit</button></li>
+    </ul>
+
+    <div class="tab-content bg-white p-4 border border-top-0 shadow-sm">
+      
+      <!-- TAB IDENTITAS & M0 -->
+      <div class="tab-pane fade show active" id="tab0">
+        <h5 class="section-title">B.0 Identitas Narapidana</h5>
+        <div class="row g-2">
+          <div class="col-md-3"><label class="form-label">Nama</label><input type="text" class="form-control" id="id_nama"></div>
+          <div class="col-md-3"><label class="form-label">No. Register</label><input type="text" class="form-control" id="id_noreg"></div>
+          <div class="col-md-3"><label class="form-label">UPT / Kanwil</label><input type="text" class="form-control" id="id_upt"></div>
+          <div class="col-md-3"><label class="form-label">Tempat, Tgl Lahir</label><input type="text" class="form-control" id="id_ttl"></div>
+          <div class="col-md-2"><label class="form-label">Usia</label><input type="number" class="form-control" id="id_usia"></div>
+          <div class="col-md-3"><label class="form-label">Tgl Asesmen</label><input type="date" class="form-control" id="id_tglasesmen"></div>
+          <div class="col-md-4"><label class="form-label">Pasal & Perkara</label><input type="text" class="form-control" id="id_pasal"></div>
+          <div class="col-md-3"><label class="form-label">Lama Pidana</label><input type="text" class="form-control" id="id_lamapidana"></div>
+        </div>
+        
+        <h5 class="section-title">Modul 0: Skrinning Administratif</h5>
+        <div class="row g-2">
+          <div class="col-md-3"><label class="form-label">0.1 Usia 20-40</label><select class="form-select" id="m0_1"><option>Ya</option><option>Tidak</option></select></div>
+          <div class="col-md-3"><label class="form-label">0.2 Bkn Pidana Mati</label><select class="form-select" id="m0_2"><option>Ya</option><option>Tidak</option></select></div>
+          <div class="col-md-3"><label class="form-label">0.3 Bkn Bandar</label><select class="form-select" id="m0_3"><option>Ya</option><option>Tidak</option></select></div>
+          <div class="col-md-3"><label class="form-label">0.4 Bkn Pengecualian</label><select class="form-select" id="m0_4"><option>Ya</option><option>Tidak</option></select></div>
+          <div class="col-md-3"><label class="form-label">0.5 Bkn Perlindungan Ank</label><select class="form-select" id="m0_5"><option>Bukan</option><option>Termasuk</option></select></div>
+          <div class="col-md-3"><label class="form-label">0.6 Register F</label><select class="form-select" id="m0_6"><option>Tidak</option><option>Pernah Ringan</option><option>Pernah Lainnya</option></select></div>
+          <div class="col-md-3"><label class="form-label">0.7 Sisa Pidana</label><select class="form-select" id="m0_7"><option>Jarak >= 6 bln</option><option>Jarak < 6 bln</option></select></div>
+          <div class="col-md-3"><label class="form-label">0.8 Tdk Ada Kasus Lain</label><select class="form-select" id="m0_8"><option>Ya</option><option>Tidak</option></select></div>
+          <div class="col-md-3"><label class="form-label">0.9 Bersedia</label><select class="form-select" id="m0_9"><option>Bersedia</option><option>Tidak</option></select></div>
+          <div class="col-md-3"><label class="form-label">Hasil Modul 0</label><select class="form-select bg-warning fw-bold" id="m0_hasil"><option>Lanjut</option><option>Berhenti</option><option>Ditunda</option></select></div>
+        </div>
+      </div>
+
+      <!-- TAB MODUL 1 -->
+      <div class="tab-pane fade" id="tab1">
+        <h5 class="section-title">1.1 Data Dokumen</h5>
+        <div class="row g-2">
+          <div class="col-md-3"><label class="form-label">Pasal Didakwa</label><input type="text" class="form-control" id="m1_pasal"></div>
+          <div class="col-md-2"><label class="form-label">Berat BB</label><input type="text" class="form-control" id="m1_bb"></div>
+          <div class="col-md-2"><label class="form-label">Peran</label><input type="text" class="form-control" id="m1_peran"></div>
+          <div class="col-md-3"><label class="form-label">TAT BNN/ASSIST</label><input type="text" class="form-control" id="m1_tat"></div>
+          <div class="col-md-2"><label class="form-label">Tes Urin</label><input type="text" class="form-control" id="m1_urin"></div>
+        </div>
+        
+        <h5 class="section-title">1.2 Wawancara Riwayat Penggunaan</h5>
+        <div class="row g-2">
+          <div class="col-md-2"><label class="form-label">Zat Utama</label><input type="text" class="form-control" id="m1_zat"></div>
+          <div class="col-md-2"><label class="form-label">Usia Pertama</label><input type="text" class="form-control" id="m1_usia"></div>
+          <div class="col-md-2"><label class="form-label">Lama Rutin</label><input type="text" class="form-control" id="m1_lama"></div>
+          <div class="col-md-2"><label class="form-label">Frekuensi</label><input type="text" class="form-control" id="m1_frek"></div>
+          <div class="col-md-2"><label class="form-label">Cara Pakai</label><input type="text" class="form-control" id="m1_cara"></div>
+          <div class="col-md-2"><label class="form-label">Pakai Terakhir</label><input type="date" class="form-control" id="m1_terakhir"></div>
+          <div class="col-md-6"><label class="form-label">Pernah Rehab</label><input type="text" class="form-control" id="m1_rehab"></div>
+          <div class="col-md-6"><label class="form-label">Coba Berhenti</label><input type="text" class="form-control" id="m1_berhenti"></div>
+        </div>
+
+        <h5 class="section-title">1.3 Daftar 11 Gejala (Ceklis yang dialami)</h5>
+        <div id="m1_gejala_container" class="row"></div>
+        <div class="mt-2 fw-bold">Skor Gejala M1.3: <span id="skorM1" class="text-primary fs-5">0</span> / 11</div>
+        <input type="hidden" id="val_skorM1" value="0">
+
+        <h5 class="section-title">1.4 - 1.6 Kesimpulan Modul 1</h5>
+        <div class="row g-2">
+          <div class="col-md-4"><label class="form-label">Triangulasi</label><select class="form-select" id="m1_triangulasi"><option>Konsisten</option><option>Sebagian</option><option>Tidak Konsisten</option></select></div>
+          <div class="col-md-4"><label class="form-label">Red Flag</label><select class="form-select" id="m1_redflag"><option>Tidak Ada</option><option>Ada Pendukung</option><option>Ada Kuat</option></select></div>
+          <div class="col-md-4"><label class="form-label">1.6 Kategori Kesimpulan</label><select class="form-select border-primary fw-bold" id="m1_kategori"><option>Kategori 1 (Terverifikasi)</option><option>Kategori 2 (Sedang)</option><option>Kategori 3 (Bukan Pengguna)</option><option>Kategori 4 (Pengedar)</option></select></div>
+        </div>
+      </div>
+
+      <!-- TAB MODUL 2 & 3 -->
+      <div class="tab-pane fade" id="tab2">
+        <h5 class="section-title">Modul 2: Tanda Vital & Medis (Oleh Tenaga Kesehatan)</h5>
+        <div class="row g-2 mb-3">
+          <div class="col-md-2"><label class="form-label">Tensi</label><input type="text" class="form-control" id="m2_td"></div>
+          <div class="col-md-2"><label class="form-label">Nadi</label><input type="text" class="form-control" id="m2_nadi"></div>
+          <div class="col-md-2"><label class="form-label">Suhu</label><input type="text" class="form-control" id="m2_suhu"></div>
+          <div class="col-md-2"><label class="form-label">BB (kg)</label><input type="text" class="form-control" id="m2_bb"></div>
+          <div class="col-md-2"><label class="form-label">TB (cm)</label><input type="text" class="form-control" id="m2_tb"></div>
+          <div class="col-md-12"><label class="form-label">Kesimpulan Modul 2</label>
+            <select class="form-select border-primary fw-bold" id="m2_kesimpulan" onchange="calcTotal()">
+              <option value="9">LAYAK (9 Poin)</option>
+              <option value="5">LAYAK BERSYARAT (5 Poin)</option>
+              <option value="0">TUNDA (0 Poin)</option>
+            </select>
+          </div>
+        </div>
+
+        <h5 class="section-title">Modul 3: Risiko & Stabilitas (Data SDP - Maks 20)</h5>
+        <div class="row g-2">
+          <div class="col-md-2"><label class="form-label">3.1 RRI</label><select class="form-select m3-val" id="m3_1" onchange="calcTotal()"><option value="7">Rendah (7)</option><option value="5">Sedang (5)</option><option value="3">Tinggi (3)</option><option value="0">Sgt Tinggi (0)</option></select></div>
+          <div class="col-md-2"><label class="form-label">3.2 Screening</label><select class="form-select m3-val" id="m3_2" onchange="calcTotal()"><option value="6">Minimum (6)</option><option value="3">Medium (3)</option><option value="0">Maksimum (0)</option></select></div>
+          <div class="col-md-2"><label class="form-label">3.3 Rwyt Kabur</label><select class="form-select" id="m3_3"><option>Tidak pernah</option><option>Pernah</option></select></div>
+          <div class="col-md-3"><label class="form-label">3.4 Kekerasan (12 bln)</label><select class="form-select m3-val" id="m3_4" onchange="calcTotal()"><option value="4">Tidak ada (4)</option><option value="0">Ada (0)</option></select></div>
+          <div class="col-md-3"><label class="form-label">3.5 Pembinaan</label><select class="form-select m3-val" id="m3_5" onchange="calcTotal()"><option value="3">Tanpa teguran (3)</option><option value="1">Teguran lisan (1)</option></select></div>
+        </div>
+        <div class="mt-2 fw-bold">Skor Modul 3: <span id="skorM3_view" class="text-danger fs-5">20</span> / 20</div>
+        <input type="hidden" id="val_skorM3" value="20">
+      </div>
+
+      <!-- TAB MODUL 4 -->
+      <div class="tab-pane fade" id="tab4">
+        <h5 class="section-title">4A. Minat & Bakat (0=Tdk Tertarik, 1=Biasa, 2=Sangat Tertarik)</h5>
+        <table class="table table-bordered table-sm table-radio mt-2" id="tabel4a"></table>
+        <div class="row g-2">
+          <div class="col-md-4"><label class="form-label">4A.2 Pengalaman Relevan (0-5)</label><input type="number" class="form-control" id="m4a_pengalaman" value="0" onchange="calcTotal()"></div>
+          <div class="col-md-4"><label class="form-label">4A.3 Kesediaan Belajar (0-2)</label><input type="number" class="form-control" id="m4a_kesediaan" value="0" onchange="calcTotal()"></div>
+        </div>
+        <div class="fw-bold mt-2">Skor Modul 4A: <span id="skorM4A_view" class="text-success fs-5">0</span> / 13</div>
+        <input type="hidden" id="val_skorM4A" value="0">
+
+        <h5 class="section-title">4B. Motivasi & Kesiapan Berubah (1=STS, 2=TS, 3=S, 4=SS)</h5>
+        <table class="table table-bordered table-sm table-radio mt-2" id="tabel4b"></table>
+        <div class="fw-bold mt-2">Skor Konversi M4B: <span id="skorM4B_view" class="text-success fs-5">0</span> / 25</div>
+        <input type="hidden" id="val_skorM4B_mentah" value="0">
+        <input type="hidden" id="val_skorM4B_konv" value="0">
+
+        <h5 class="section-title">4C (Sikap Kerja) & 4D (Kapasitas Fisik)</h5>
+        <div class="row g-2">
+          <!-- Modul 4C Dimensions -->
+          <div class="col-md-2"><label class="form-label">4C.1 Disiplin(1-5)</label><input type="number" class="form-control m4c-val" id="m4c_1" value="3" onchange="calcTotal()"></div>
+          <div class="col-md-2"><label class="form-label">4C.2 Tgg Jawab(1-5)</label><input type="number" class="form-control m4c-val" id="m4c_2" value="3" onchange="calcTotal()"></div>
+          <div class="col-md-2"><label class="form-label">4C.3 Kerja Sama(1-5)</label><input type="number" class="form-control m4c-val" id="m4c_3" value="3" onchange="calcTotal()"></div>
+          <div class="col-md-2"><label class="form-label">4C.4 Emosi(1-5)</label><input type="number" class="form-control m4c-val" id="m4c_4" value="3" onchange="calcTotal()"></div>
+          <div class="col-md-2"><label class="form-label">4C.5 Kepatuhan(1-5)</label><input type="number" class="form-control m4c-val" id="m4c_5" value="3" onchange="calcTotal()"></div>
+          <div class="col-md-2"><label class="form-label">Skor 4C (Maks 25)</label><input type="text" class="form-control fw-bold" id="val_skorM4C" readonly></div>
+        </div>
+        <div class="row g-2 mt-2">
+          <!-- Modul 4D -->
+          <div class="col-md-2"><label class="form-label">4D.1 Tahan Fisik (0-2)</label><input type="number" class="form-control m4d-val" id="m4d_1" value="2" onchange="calcTotal()"></div>
+          <div class="col-md-2"><label class="form-label">4D.2 Rwyt Kerja(0-2)</label><input type="number" class="form-control m4d-val" id="m4d_2" value="2" onchange="calcTotal()"></div>
+          <div class="col-md-2"><label class="form-label">4D.3 Praktik (0-2)</label><input type="number" class="form-control m4d-val" id="m4d_3" value="2" onchange="calcTotal()"></div>
+          <div class="col-md-2"><label class="form-label">Skor 4D (Maks 6)</label><input type="text" class="form-control fw-bold" id="val_skorM4D" readonly></div>
+        </div>
+      </div>
+
+      <!-- TAB REKAP -->
+      <div class="tab-pane fade" id="tab5">
+        <h5 class="section-title bg-success">B.5 Rekap Skor & Keputusan Akhir</h5>
+        <table class="table table-bordered fs-4 mt-3">
+          <tr class="table-light"><th>GRAND TOTAL SKOR (Maks 98)</th><th class="text-center text-danger" id="gt_view">0</th></tr>
+          <tr><th>Kategori Rekomendasi Sistem</th><th class="text-center text-primary fw-bold" id="kat_view">TIDAK LAYAK</th></tr>
+        </table>
+        <input type="hidden" id="val_gt" value="0">
+        <input type="hidden" id="val_kat" value="-">
+
+        <div class="row g-3">
+          <div class="col-md-6"><label class="form-label">Rekomendasi Klaster Pekerjaan</label><select class="form-select border-primary" id="val_klaster"><option>Pertanian (Kementan)</option><option>Perikanan (KKP)</option><option>Re-Edukasi Non-Lahan</option></select></div>
+          <div class="col-md-6"><label class="form-label">Keputusan Sidang TPP UPT</label><select class="form-select border-primary" id="val_tpp"><option>Disetujui</option><option>Tidak Disetujui</option><option>Ditunda</option></select></div>
+        </div>
+        
+        <hr class="mt-5">
+        <button type="button" class="btn btn-primary btn-lg w-100 shadow" id="btnSimpan" onclick="submitData()">💾 SUBMIT SELURUH DETAIL ASESMEN KE DATABASE</button>
+      </div>
+
+    </div>
+  </form>
+</div>
+
+<!-- ================= JAVASCRIPT ================= -->
+<script>
+  // PENTING: Ganti URL di bawah ini dengan URL Web App dari Google Apps Script Anda
+  const API_URL = "https://script.google.com/macros/s/AKfycbzo3IGnkOBHLLDtP_FD4rnnXC81rq6S0OuC_vI0FQ-mQXa0TLwLIRqC-1Ix86NbgGtN/exec"; 
+
+  let asr = "";
+  
+  // Data Master Naskah Pertanyaan Instrumen
+  const list_m1 = ["1. Memakai lebih banyak/lama dari rencana", "2. Ingin berhenti tapi gagal", "3. Banyak waktu tersita mencari/memakai zat", "4. Craving (Dorongan kuat)", "5. Gagal kewajiban pekerjaan/keluarga karena zat", "6. Tetap pakai meski timbul masalah sosial", "7. Meninggalkan hobi/pekerjaan karena zat", "8. Pakai di situasi berbahaya", "9. Tetap pakai meski sadar ada masalah fisik/mental", "10. Toleransi dosis meningkat", "11. Mengalami gejala putus zat saat berhenti"];
+  const list_m4a = ["A1. Padi/Sawah", "A2. Sayur/Kebun", "A3. Alat Tani", "B1. Tambak", "B2. Kapal Ikan", "B3. Olah Ikan", "C1. Mekanik Mesin", "C2. Pertukangan/Las", "C3. Alat Kerja", "D1. Memasak/Roti", "D2. Gudang/Kemas", "D3. Menjahit/Kriya", "E1. Adm/Data", "E2. Jasa Cukur/Laundry", "E3. Komputer"];
+  const list_m4b = ["1. Saya ingin berhenti memakai narkotika.", "2. Saya sadar narkotika merugikan saya dan keluarga.", "3. Saya bersedia mengikuti terapi dan tes urin.", "4. Saya merasa tdk perlu berubah (Reverse).", "5. Saya mau bekerja keras setiap hari.", "6. Saya mau belajar keterampilan baru.", "7. Saya bersedia mengikuti aturan walau tdk sesuai kemauan.", "8. Saya ikut agar cepat bebas (Reverse).", "9. Saya punya rencana jelas setelah bebas.", "10. Saya tau cara menghindari keinginan pakai lagi.", "11. Saya yakin bisa bersih setelah program.", "12. Keluarga mendukung saya ikut program."];
+
+  window.onload = function() {
+    // Generate Checkboxes Modul 1
+    let htmlM1 = "";
+    list_m1.forEach((q, i) => {
+      htmlM1 += `<div class="col-md-6"><div class="form-check"><input class="form-check-input m1-cek" type="checkbox" id="m1_g${i+1}" value="Ya" onchange="calcTotal()"><label class="form-check-label">${q}</label></div></div>`;
+    });
+    document.getElementById('m1_gejala_container').innerHTML = htmlM1;
+
+    // Generate Selects Modul 4A
+    let html4a = `<tr class="table-light"><th>Pernyataan (0=Tdk Tertarik, 1=Biasa, 2=Sgt Tertarik)</th><th style="width:100px;">Pilihan</th></tr>`;
+    list_m4a.forEach((q, i) => {
+      html4a += `<tr><td class="text-start">${q}</td><td><select class="form-select form-select-sm m4a-val" id="m4a_${i+1}" onchange="calcTotal()"><option value="0">0</option><option value="1">1</option><option value="2">2</option></select></td></tr>`;
+    });
+    document.getElementById('tabel4a').innerHTML = html4a;
+
+    // Generate Selects Modul 4B
+    let html4b = `<tr class="table-light"><th>Pernyataan (1=STS, 2=TS, 3=S, 4=SS)</th><th style="width:100px;">Pilihan</th></tr>`;
+    list_m4b.forEach((q, i) => {
+      html4b += `<tr><td class="text-start">${q}</td><td><select class="form-select form-select-sm m4b-val" id="m4b_${i+1}" onchange="calcTotal()"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option></select></td></tr>`;
+    });
+    document.getElementById('tabel4b').innerHTML = html4b;
+    
+    // Inisialisasi perhitungan
+    calcTotal();
+  };
+
+  // Fungsi Login dengan API Fetch (Vercel Support)
+  function doLogin() {
+    let btn = document.querySelector('#formLogin button'); 
+    btn.innerText = "Memeriksa..."; btn.disabled = true;
+    
+    let u = document.getElementById('username').value;
+    let p = document.getElementById('password').value;
+
+    fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: "login", username: u, password: p })
+    })
+    .then(response => response.json())
+    .then(r => {
+      if(r.success) {
+        asr = r.user.nama; 
+        document.getElementById('loginSection').style.display = 'none';
+        document.getElementById('appSection').style.display = 'block';
+        document.getElementById('userInfo').innerText = asr + " (" + r.user.peran + ")";
+      } else {
+        alert(r.message); 
+        btn.innerText = "Masuk"; btn.disabled = false;
+      }
+    }).catch(err => {
+      alert("Koneksi gagal. Pastikan API_URL sudah benar. Error: " + err);
+      btn.innerText = "Masuk"; btn.disabled = false;
+    });
+  }
+
+  // Fungsi Kalkulasi Real-time
+  function calcTotal() {
+    // Modul 1
+    let sk1 = document.querySelectorAll('.m1-cek:checked').length;
+    document.getElementById('skorM1').innerText = sk1;
+    document.getElementById('val_skorM1').value = sk1;
+
+    // Modul 3
+    let sk3 = 0; document.querySelectorAll('.m3-val').forEach(e => sk3 += parseInt(e.value)||0);
+    document.getElementById('skorM3_view').innerText = sk3;
+    document.getElementById('val_skorM3').value = sk3;
+
+    // Modul 4A
+    let sk4a_arr = Array.from(document.querySelectorAll('.m4a-val')).map(e => parseInt(e.value)||0);
+    let maxMinat = Math.max(...sk4a_arr); 
+    let sk4a_total = maxMinat + (parseInt(document.getElementById('m4a_pengalaman').value)||0) + (parseInt(document.getElementById('m4a_kesediaan').value)||0);
+    document.getElementById('skorM4A_view').innerText = sk4a_total;
+    document.getElementById('val_skorM4A').value = sk4a_total;
+
+    // Modul 4B (Konversi dengan Reverse scoring Q4 dan Q8)
+    let sk4b_mth = 0; 
+    document.querySelectorAll('.m4b-val').forEach((e, i) => {
+      let v = parseInt(e.value)||0;
+      if(i === 3 || i === 7) v = 5 - v; // Reverse logic: 1->4, 4->1
+      sk4b_mth += v;
+    });
+    let sk4b_k = (sk4b_mth >= 39) ? 25 : (sk4b_mth >= 33) ? 20 : (sk4b_mth >= 27) ? 15 : (sk4b_mth >= 21) ? 10 : 5;
+    document.getElementById('skorM4B_view').innerText = sk4b_k;
+    document.getElementById('val_skorM4B_mentah').value = sk4b_mth;
+    document.getElementById('val_skorM4B_konv').value = sk4b_k;
+
+    // Modul 4C & 4D
+    let sk4c = 0; document.querySelectorAll('.m4c-val').forEach(e => sk4c += parseInt(e.value)||0);
+    document.getElementById('val_skorM4C').value = sk4c;
+    let sk4d = 0; document.querySelectorAll('.m4d-val').forEach(e => sk4d += parseInt(e.value)||0);
+    document.getElementById('val_skorM4D').value = sk4d;
+
+    // Hitung Grand Total
+    let m2 = parseInt(document.getElementById('m2_kesimpulan').value)||0;
+    let grand = sk3 + sk4a_total + sk4b_k + sk4c + sk4d + m2;
+    document.getElementById('gt_view').innerText = grand;
+    document.getElementById('val_gt').value = grand;
+
+    // Set Kategori
+    let kat = (m2 === 0) ? "DITUNDA" : (grand >= 70) ? "LAYAK" : (grand >= 55) ? "LAYAK BERSYARAT" : "TIDAK LAYAK";
+    document.getElementById('kat_view').innerText = kat;
+    document.getElementById('val_kat').value = kat;
+  }
+
+  // Fungsi Kirim Seluruh Data (106 Kolom) ke Backend melalui Fetch
+  function submitData() {
+    let btn = document.getElementById('btnSimpan'); 
+    btn.disabled = true; btn.innerText = "Menyimpan ke Database...";
+    
+    // Susun array persis sesuai urutan 106 kolom Google Sheets Backend
+    let arr = [
+      asr, 
+      document.getElementById('id_nama').value, document.getElementById('id_noreg').value, document.getElementById('id_upt').value, document.getElementById('id_ttl').value, document.getElementById('id_usia').value, document.getElementById('id_tglasesmen').value, document.getElementById('id_pasal').value, document.getElementById('id_lamapidana').value,
+      
+      document.getElementById('m0_1').value, document.getElementById('m0_2').value, document.getElementById('m0_3').value, document.getElementById('m0_4').value, document.getElementById('m0_5').value, document.getElementById('m0_6').value, document.getElementById('m0_7').value, document.getElementById('m0_8').value, document.getElementById('m0_9').value, document.getElementById('m0_hasil').value,
+      
+      document.getElementById('m1_pasal').value, document.getElementById('m1_bb').value, document.getElementById('m1_peran').value, document.getElementById('m1_tat').value, document.getElementById('m1_urin').value,
+      document.getElementById('m1_zat').value, document.getElementById('m1_usia').value, document.getElementById('m1_lama').value, document.getElementById('m1_frek').value, document.getElementById('m1_cara').value, document.getElementById('m1_terakhir').value, document.getElementById('m1_rehab').value, document.getElementById('m1_berhenti').value
+    ];
+    
+    for(let i=1; i<=11; i++) arr.push(document.getElementById('m1_g'+i).checked ? "Ya" : "Tidak");
+    arr.push(document.getElementById('val_skorM1').value, document.getElementById('m1_triangulasi').value, document.getElementById('m1_redflag').value, document.getElementById('m1_kategori').value);
+    
+    arr.push(document.getElementById('m2_td').value, document.getElementById('m2_nadi').value, document.getElementById('m2_suhu').value, document.getElementById('m2_bb').value, document.getElementById('m2_tb').value, document.getElementById('m2_kesimpulan').value);
+    
+    arr.push(document.getElementById('m3_1').value, document.getElementById('m3_2').value, document.getElementById('m3_3').value, document.getElementById('m3_4').value, document.getElementById('m3_5').value, document.getElementById('val_skorM3').value);
+
+    for(let i=1; i<=15; i++) arr.push(document.getElementById('m4a_'+i).value);
+    arr.push(document.getElementById('m4a_pengalaman').value, document.getElementById('m4a_kesediaan').value, document.getElementById('val_skorM4A').value);
+
+    for(let i=1; i<=12; i++) arr.push(document.getElementById('m4b_'+i).value);
+    arr.push(document.getElementById('val_skorM4B_mentah').value, document.getElementById('val_skorM4B_konv').value);
+
+    for(let i=1; i<=5; i++) arr.push(document.getElementById('m4c_'+i).value);
+    arr.push(document.getElementById('val_skorM4C').value);
+    
+    for(let i=1; i<=3; i++) arr.push(document.getElementById('m4d_'+i).value);
+    arr.push(document.getElementById('val_skorM4D').value);
+
+    arr.push(document.getElementById('val_gt').value, document.getElementById('val_kat').value, document.getElementById('val_klaster').value, document.getElementById('val_tpp').value);
+
+    // Kirim Request ke Google Apps Script
+    fetch(API_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: "save", payload: arr })
+    })
+    .then(response => response.json())
+    .then(r => {
+      alert(r.message); 
+      btn.disabled = false; btn.innerText = "💾 SUBMIT SELURUH DETAIL ASESMEN KE DATABASE"; 
+      document.getElementById('formAsesmen').reset(); 
+      calcTotal();
+    }).catch(err => {
+      alert("Gagal menyimpan data. Pastikan konfigurasi Apps Script benar. Error: " + err);
+      btn.disabled = false; btn.innerText = "💾 SUBMIT SELURUH DETAIL ASESMEN KE DATABASE"; 
+    });
+  }
+</script>
+</body>
+</html>
