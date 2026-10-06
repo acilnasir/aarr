@@ -6,7 +6,6 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   
-  <!-- Library html2pdf untuk Generate PDF -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
   <style>
@@ -14,23 +13,13 @@
     .section-title { background: #0D3B66; color: white; padding: 8px 15px; border-radius: 4px; margin-top: 25px; }
     .table-radio td { text-align: center; vertical-align: middle; }
     .table-radio th { font-size: 0.9rem; }
-    
-    /* Area sembunyi untuk perenderan PDF */
-    #pdfHiddenArea {
-        position: absolute;
-        left: -9999px;
-        top: -9999px;
-        width: 800px;
-        background: #fff;
-    }
+    #pdfHiddenArea { position: absolute; left: -9999px; top: -9999px; width: 800px; background: #fff; }
   </style>
 </head>
 <body class="bg-light">
 
-<!-- AREA RENDER PDF (Disembunyikan dari antarmuka pengguna) -->
-<div id="pdfHiddenArea">
-    <div id="pdfContent"></div>
-</div>
+<!-- AREA RENDER PDF -->
+<div id="pdfHiddenArea"><div id="pdfContent"></div></div>
 
 <!-- DIV LOGIN -->
 <div class="container py-5" id="loginSection" style="max-width: 400px;">
@@ -57,17 +46,13 @@
   </div>
 
   <ul class="nav nav-tabs" id="mainTabs">
-    <li class="nav-item">
-      <button class="nav-link active fw-bold text-primary" data-bs-toggle="tab" data-bs-target="#tabDashboard" type="button" onclick="loadDataList()">📋 Data Asesmen</button>
-    </li>
-    <li class="nav-item">
-      <button class="nav-link fw-bold text-success" data-bs-toggle="tab" data-bs-target="#tabForm" type="button" onclick="resetFormForNew()">➕ Asesmen Baru</button>
-    </li>
+    <li class="nav-item"><button class="nav-link active fw-bold text-primary" data-bs-toggle="tab" data-bs-target="#tabDashboard" type="button" onclick="loadDataList()">📋 Data Asesmen</button></li>
+    <li class="nav-item"><button class="nav-link fw-bold text-success" data-bs-toggle="tab" data-bs-target="#tabForm" type="button" onclick="resetFormForNew()">➕ Asesmen Baru</button></li>
   </ul>
 
   <div class="tab-content bg-white p-4 border border-top-0 shadow-sm">
     
-    <!-- ================== TAB DASHBOARD ================== -->
+    <!-- DASHBOARD -->
     <div class="tab-pane fade show active" id="tabDashboard">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="m-0">Daftar Hasil Asesmen Narapidana</h5>
@@ -76,10 +61,7 @@
       <div class="table-responsive">
         <table class="table table-bordered table-hover align-middle">
           <thead class="table-dark">
-            <tr>
-              <th>ID/Waktu</th><th>Asesor</th><th>No. Register</th><th>Nama Narapidana</th>
-              <th>UPT</th><th>Skor</th><th>Kategori Akhir</th><th>Aksi</th>
-            </tr>
+            <tr><th>ID/Waktu</th><th>Asesor</th><th>No. Register</th><th>Nama Narapidana</th><th>UPT</th><th>Skor</th><th>Kategori Akhir</th><th>Aksi</th></tr>
           </thead>
           <tbody id="dataTableBody">
             <tr><td colspan="8" class="text-center">Memuat data...</td></tr>
@@ -88,11 +70,10 @@
       </div>
     </div>
 
-    <!-- ================== TAB FORM INPUT / EDIT ================== -->
+    <!-- FORM INPUT / EDIT -->
     <div class="tab-pane fade" id="tabForm">
-      
       <div class="alert alert-warning d-none" id="editAlert">
-        <strong>Mode Edit:</strong> Sedang mengubah data ID <span id="editIdLabel" class="fw-bold"></span>. 
+        <strong>Mode Edit:</strong> Sedang mengubah data dengan No. Register <span id="editIdLabel" class="fw-bold"></span>. 
         <button class="btn btn-sm btn-outline-dark float-end" onclick="resetFormForNew()">Batal Edit</button>
       </div>
 
@@ -254,7 +235,7 @@
 
   let asr = "";
   let globalDataMap = {}; 
-  let activeEditId = null; 
+  let activeEditNoreg = null; // KUNCI UTAMA SEKARANG MENGGUNAKAN NO. REGISTER
 
   const list_m1 = ["1. Pakai lebih banyak", "2. Gagal berhenti", "3. Waktu tersita", "4. Craving", "5. Gagal kewajiban", "6. Masalah sosial", "7. Meninggalkan hobi", "8. Situasi bahaya", "9. Masalah fisik", "10. Toleransi dosis", "11. Gejala putus zat"];
   const list_m4a = ["A1 Padi/Sawah", "A2 Sayur/Kebun", "A3 Alat Tani", "B1 Tambak", "B2 Kapal", "B3 Olah Ikan", "C1 Mekanik", "C2 Pertukangan", "C3 Alat", "D1 Memasak", "D2 Gudang", "D3 Menjahit", "E1 Adm/Data", "E2 Laundry/Cukur", "E3 Komputer"];
@@ -267,7 +248,6 @@
     calcTotal();
   };
 
-  // ----- LOGIC AUTH & READ -----
   function doLogin() {
     let btn = document.querySelector('#formLogin button'); btn.innerText = "Memeriksa..."; btn.disabled = true;
     fetch(API_URL, { method: 'POST', redirect: 'follow', headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "login", username: document.getElementById('username').value, password: document.getElementById('password').value }) })
@@ -305,22 +285,18 @@
     });
   }
 
-  // ----- LOGIC CETAK (PDF DINAMIS FULL 106 ITEM) -----
   function cetakData(id) {
     let d = globalDataMap[id];
     if (!d) return alert("Data tidak valid.");
-
     const m4c_labels = ["1. Disiplin & Waktu", "2. Tanggung Jawab", "3. Kerja Sama", "4. Kendali Emosi", "5. Kepatuhan"];
     const m4d_labels = ["1. Uji Tahan Fisik (0-2)", "2. Riwayat Kerja (0-2)", "3. Praktik (0-2)"];
 
-    // Membuat susunan HTML layout tabel rapi layaknya dokumen asli
     let html = `
     <div style="padding: 20px; font-family: 'Times New Roman', Times, serif; font-size: 11px; line-height: 1.3; color: #000;">
       <h3 style="text-align:center; font-weight:bold; margin-bottom: 2px;">INSTRUMEN KELAYAKAN DAN PENEMPATAN REHABILITASI (IKP-R)</h3>
       <h4 style="text-align:center; margin-top: 0;">NARAPIDANA PENGGUNA NAPZA BERBASIS KETAHANAN PANGAN</h4>
       <hr style="border:1px solid #000; margin-bottom:15px;">
 
-      <!-- ================= BAGIAN B.0 IDENTITAS ================= -->
       <h5 style="background:#ddd; padding:4px; font-weight:bold;">B.0 IDENTITAS DAN MODUL 0 (SKRINNING AWAL)</h5>
       <table width="100%" border="1" cellpadding="4" style="border-collapse: collapse; margin-bottom: 10px;">
         <tr><td width="25%">Nama</td><td width="25%"><b>${d[2]}</b></td><td width="25%">No. Register</td><td width="25%"><b>${d[3]}</b></td></tr>
@@ -332,107 +308,60 @@
 
       <b>Hasil Skrinning Administratif (Modul 0):</b>
       <table width="100%" border="1" cellpadding="3" style="border-collapse: collapse; margin-bottom: 10px;">
-        <tr>
-            <td width="33%">0.1 Usia 20-40: <b>${d[10]}</b></td>
-            <td width="33%">0.2 Bukan Pidana Mati: <b>${d[11]}</b></td>
-            <td width="34%">0.3 Bukan Bandar: <b>${d[12]}</b></td>
-        </tr>
-        <tr>
-            <td>0.4 Bukan Pengecualian: <b>${d[13]}</b></td>
-            <td>0.5 Bkn Perlindungan Anak: <b>${d[14]}</b></td>
-            <td>0.6 Register F: <b>${d[15]}</b></td>
-        </tr>
-        <tr>
-            <td>0.7 Sisa Pidana: <b>${d[16]}</b></td>
-            <td>0.8 Tdk Ada Kasus Lain: <b>${d[17]}</b></td>
-            <td>0.9 Bersedia ikuti program: <b>${d[18]}</b></td>
-        </tr>
+        <tr><td width="33%">0.1 Usia 20-40: <b>${d[10]}</b></td><td width="33%">0.2 Bukan Pidana Mati: <b>${d[11]}</b></td><td width="34%">0.3 Bukan Bandar: <b>${d[12]}</b></td></tr>
+        <tr><td>0.4 Bukan Pengecualian: <b>${d[13]}</b></td><td>0.5 Bkn Perlindungan Anak: <b>${d[14]}</b></td><td>0.6 Register F: <b>${d[15]}</b></td></tr>
+        <tr><td>0.7 Sisa Pidana: <b>${d[16]}</b></td><td>0.8 Tdk Ada Kasus Lain: <b>${d[17]}</b></td><td>0.9 Bersedia: <b>${d[18]}</b></td></tr>
         <tr><td colspan="3" style="background:#efefef;"><b>KESIMPULAN MODUL 0: ${d[19]}</b></td></tr>
       </table>
 
-      <!-- ================= BAGIAN MODUL 1 ================= -->
       <h5 style="background:#ddd; padding:4px; font-weight:bold;">MODUL 1: VERIFIKASI PENGGUNA NARKOTIKA</h5>
       <table width="100%" border="1" cellpadding="3" style="border-collapse: collapse; margin-bottom: 5px;">
-        <tr><th colspan="4" style="text-align:left; background:#f9f9f9;">1.1 Data Dokumen & 1.2 Wawancara Riwayat Penggunaan</th></tr>
         <tr><td width="25%">Pasal Didakwa:</td><td width="25%"><b>${d[20]}</b></td><td width="25%">Zat Utama:</td><td width="25%"><b>${d[25]}</b></td></tr>
-        <tr><td>Berat BB:</td><td><b>${d[21]}</b></td><td>Usia Pertama Pakai:</td><td><b>${d[26]}</b></td></tr>
+        <tr><td>Berat BB:</td><td><b>${d[21]}</b></td><td>Usia Pertama:</td><td><b>${d[26]}</b></td></tr>
         <tr><td>Peran (Putusan):</td><td><b>${d[22]}</b></td><td>Lama Rutin:</td><td><b>${d[27]}</b></td></tr>
-        <tr><td>TAT BNN/ASSIST:</td><td><b>${d[23]}</b></td><td>Frekuensi & Cara Pakai:</td><td><b>${d[28]} / ${d[29]}</b></td></tr>
+        <tr><td>TAT BNN/ASSIST:</td><td><b>${d[23]}</b></td><td>Frek & Cara:</td><td><b>${d[28]} / ${d[29]}</b></td></tr>
         <tr><td>Hasil Tes Urin:</td><td><b>${d[24]}</b></td><td>Terakhir Pakai:</td><td><b>${d[30]}</b></td></tr>
-        <tr><td>Pernah Rehab:</td><td><b>${d[31]}</b></td><td>Coba Berhenti:</td><td><b>${d[32]}</b></td></tr>
       </table>
 
-      <b>1.3 Daftar 11 Gejala Gangguan Penggunaan Zat (Ceklis yang dialami):</b>
+      <b>1.3 Daftar 11 Gejala (Ceklis yang dialami):</b>
       <table width="100%" border="1" cellpadding="2" style="border-collapse: collapse; margin-bottom: 5px;">`;
-
-      // Loop rendering 11 gejala ke dalam 2 kolom tabel
       for (let i=0; i<11; i+=2) {
-        html += `<tr>
-          <td width="5%" align="center"><b>${d[33+i]==="Ya"?"[X]":"[ ]"}</b></td>
-          <td width="45%">${list_m1[i]}</td>`;
-        if (i+1 < 11) {
-          html += `<td width="5%" align="center"><b>${d[33+i+1]==="Ya"?"[X]":"[ ]"}</b></td><td width="45%">${list_m1[i+1]}</td></tr>`;
-        } else {
-          html += `<td width="5%"></td><td width="45%"></td></tr>`;
-        }
+        html += `<tr><td width="5%" align="center"><b>${d[33+i]==="Ya"?"[X]":"[ ]"}</b></td><td width="45%">${list_m1[i]}</td>`;
+        if (i+1 < 11) html += `<td width="5%" align="center"><b>${d[33+i+1]==="Ya"?"[X]":"[ ]"}</b></td><td width="45%">${list_m1[i+1]}</td></tr>`;
+        else html += `<td width="5%"></td><td width="45%"></td></tr>`;
       }
-
     html += `
         <tr><td colspan="4" style="background:#efefef;"><b>Total Skor Gejala M1.3: ${d[44]} dari 11</b></td></tr>
       </table>
-      
       <table width="100%" border="1" cellpadding="3" style="border-collapse: collapse; margin-bottom: 15px;">
-        <tr>
-          <td width="33%">1.4 Triangulasi: <b>${d[45]}</b></td>
-          <td width="33%">1.5 Red Flag: <b>${d[46]}</b></td>
-          <td width="34%" style="background:#d9edf7;"><b>1.6 Kategori M1: ${d[47]}</b></td>
-        </tr>
+        <tr><td width="33%">1.4 Triangulasi: <b>${d[45]}</b></td><td width="33%">1.5 Red Flag: <b>${d[46]}</b></td><td width="34%" style="background:#d9edf7;"><b>1.6 Kategori M1: ${d[47]}</b></td></tr>
       </table>
 
-      <!-- ================= BAGIAN MODUL 2 & 3 ================= -->
-      <h5 style="background:#ddd; padding:4px; font-weight:bold;">MODUL 2 (KESIAPAN FISIK) & MODUL 3 (RISIKO STABILITAS)</h5>
+      <h5 style="background:#ddd; padding:4px; font-weight:bold;">MODUL 2 (FISIK) & MODUL 3 (RISIKO)</h5>
       <table width="100%" border="1" cellpadding="3" style="border-collapse: collapse; margin-bottom: 15px;">
-        <tr><th colspan="5" style="text-align:left; background:#f9f9f9;">Tanda Vital Medis (Modul 2)</th><th style="background:#efefef;">Poin Kesimpulan M2</th></tr>
-        <tr>
-          <td>TD: <b>${d[48]}</b></td><td>Nadi: <b>${d[49]}</b></td><td>Suhu: <b>${d[50]}</b></td><td>BB: <b>${d[51]}</b></td><td>TB: <b>${d[52]}</b></td>
-          <td style="background:#d9edf7; text-align:center;"><b>${d[53]}</b></td>
-        </tr>
-        <tr><th colspan="5" style="text-align:left; background:#f9f9f9;">Faktor Risiko & Stabilitas SDP (Modul 3)</th><th style="background:#efefef;">Total Skor M3</th></tr>
-        <tr>
-          <td>3.1 RRI: <b>${d[54]}</b></td><td>3.2 Screening: <b>${d[55]}</b></td><td>3.3 Kabur: <b>${d[56]}</b></td><td>3.4 Kekerasan: <b>${d[57]}</b></td><td>3.5 Pmbinaan: <b>${d[58]}</b></td>
-          <td style="background:#d9edf7; text-align:center;"><b>${d[59]}</b></td>
-        </tr>
+        <tr><td>TD: <b>${d[48]}</b></td><td>Nadi: <b>${d[49]}</b></td><td>Suhu: <b>${d[50]}</b></td><td>BB: <b>${d[51]}</b></td><td>TB: <b>${d[52]}</b></td><td style="background:#d9edf7;"><b>Poin M2: ${d[53]}</b></td></tr>
+        <tr><td>3.1 RRI: <b>${d[54]}</b></td><td>3.2 Screening: <b>${d[55]}</b></td><td>3.3 Kabur: <b>${d[56]}</b></td><td>3.4 Kkrsn: <b>${d[57]}</b></td><td>3.5 Pmbnaan: <b>${d[58]}</b></td><td style="background:#d9edf7;"><b>Poin M3: ${d[59]}</b></td></tr>
       </table>
 
-      <!-- ================= PAGE BREAK UNTUK PDF ================= -->
       <div class="html2pdf__page-break"></div>
       
       <div style="margin-top:15px;"></div>
-      <!-- ================= BAGIAN MODUL 4 ================= -->
       <h5 style="background:#ddd; padding:4px; font-weight:bold;">MODUL 4: MINAT, BAKAT, MOTIVASI, DAN SIKAP KERJA</h5>
       <div style="display:flex; justify-content: space-between;">
-        
-        <!-- KOLOM KIRI (M4A) -->
         <div style="width: 48%;">
-          <b>4A. Minat & Bakat (Skala 0-2)</b>
+          <b>4A. Minat & Bakat (0-2)</b>
           <table width="100%" border="1" cellpadding="3" style="border-collapse: collapse; font-size:10px; margin-top:5px;">`;
-          for(let i=0; i<15; i++) {
-            html += `<tr><td>${list_m4a[i]}</td><td align="center" width="20%"><b>${d[60+i]}</b></td></tr>`;
-          }
+          for(let i=0; i<15; i++) html += `<tr><td>${list_m4a[i]}</td><td align="center" width="20%"><b>${d[60+i]}</b></td></tr>`;
     html += `
             <tr style="background:#efefef;"><td>Pengalaman Kerja Relevan (0-5)</td><td align="center"><b>${d[75]}</b></td></tr>
             <tr style="background:#efefef;"><td>Kesediaan Belajar Hal Baru (0-2)</td><td align="center"><b>${d[76]}</b></td></tr>
             <tr style="background:#d9edf7;"><td><b>TOTAL SKOR M4A</b></td><td align="center"><b style="font-size:12px;">${d[77]}</b></td></tr>
           </table>
         </div>
-
-        <!-- KOLOM KANAN (M4B) -->
         <div style="width: 48%;">
-          <b>4B. Motivasi & Kesiapan Berubah (Skala 1-4)</b>
+          <b>4B. Motivasi & Kesiapan Berubah (1-4)</b>
           <table width="100%" border="1" cellpadding="3" style="border-collapse: collapse; font-size:10px; margin-top:5px;">`;
-          for(let i=0; i<12; i++) {
-            html += `<tr><td>${list_m4b[i]}</td><td align="center" width="20%"><b>${d[78+i]}</b></td></tr>`;
-          }
+          for(let i=0; i<12; i++) html += `<tr><td>${list_m4b[i]}</td><td align="center" width="20%"><b>${d[78+i]}</b></td></tr>`;
     html += `
             <tr style="background:#efefef;"><td>Total Skor Mentah M4B</td><td align="center"><b>${d[90]}</b></td></tr>
             <tr style="background:#d9edf7;"><td><b>POIN KONVERSI M4B AKHIR</b></td><td align="center"><b style="font-size:12px;">${d[91]}</b></td></tr>
@@ -442,37 +371,29 @@
 
       <br>
       <div style="display:flex; justify-content: space-between;">
-        <!-- KOLOM KIRI (M4C) -->
         <div style="width: 48%;">
-          <b>4C. Sikap Kerja (Skala 1-5, dinilai oleh Wali)</b>
+          <b>4C. Sikap Kerja (1-5)</b>
           <table width="100%" border="1" cellpadding="3" style="border-collapse: collapse; font-size:10px; margin-top:5px;">`;
-          for(let i=0; i<5; i++) {
-            html += `<tr><td>${m4c_labels[i]}</td><td align="center" width="20%"><b>${d[92+i]}</b></td></tr>`;
-          }
+          for(let i=0; i<5; i++) html += `<tr><td>${m4c_labels[i]}</td><td align="center" width="20%"><b>${d[92+i]}</b></td></tr>`;
     html += `
             <tr style="background:#d9edf7;"><td><b>TOTAL SKOR M4C</b></td><td align="center"><b style="font-size:12px;">${d[97]}</b></td></tr>
           </table>
         </div>
-
-        <!-- KOLOM KANAN (M4D) -->
         <div style="width: 48%;">
-          <b>4D. Kapasitas Kerja (Uji Fisik)</b>
+          <b>4D. Kapasitas Kerja</b>
           <table width="100%" border="1" cellpadding="3" style="border-collapse: collapse; font-size:10px; margin-top:5px;">`;
-          for(let i=0; i<3; i++) {
-            html += `<tr><td>${m4d_labels[i]}</td><td align="center" width="20%"><b>${d[98+i]}</b></td></tr>`;
-          }
+          for(let i=0; i<3; i++) html += `<tr><td>${m4d_labels[i]}</td><td align="center" width="20%"><b>${d[98+i]}</b></td></tr>`;
     html += `
             <tr style="background:#d9edf7;"><td><b>TOTAL SKOR M4D</b></td><td align="center"><b style="font-size:12px;">${d[101]}</b></td></tr>
           </table>
         </div>
       </div>
 
-      <!-- ================= REKAP B.5 ================= -->
       <h5 style="background:#ddd; padding:4px; font-weight:bold; margin-top:20px;">B.5 REKAP SKOR DAN KEPUTUSAN AKHIR</h5>
       <table width="100%" border="1" cellpadding="6" style="border-collapse: collapse;">
         <tr style="background:#d9edf7;"><td width="50%"><b>JUMLAH TOTAL SKOR IKP-R</b></td><td width="50%" align="center"><b style="font-size:16px;">${d[102]}</b></td></tr>
         <tr style="background:#d9edf7;"><td><b>KATEGORI HASIL SISTEM</b></td><td align="center"><b style="font-size:16px; color:#c00;">${d[103]}</b></td></tr>
-        <tr><td>Rekomendasi Klaster Pekerjaan Terpilih</td><td align="center"><b>${d[104]}</b></td></tr>
+        <tr><td>Rekomendasi Klaster Pekerjaan</td><td align="center"><b>${d[104]}</b></td></tr>
         <tr><td>Keputusan Sidang TPP UPT</td><td align="center"><b>${d[105]}</b></td></tr>
       </table>
       
@@ -481,44 +402,40 @@
       <table width="100%" style="margin-top:30px; font-size:11px;">
         <tr>
           <td width="65%"></td>
-          <td width="35%" align="center">
-            Tanda Tangan Asesor,<br><br><br><br>
-            ( <b style="text-decoration: underline;">${d[1]}</b> )
-          </td>
+          <td width="35%" align="center">Tanda Tangan Asesor,<br><br><br><br>( <b style="text-decoration: underline;">${d[1]}</b> )</td>
         </tr>
       </table>
     </div>
     `;
 
-    // Memasukkan template HTML tersebut ke dalam kontainer sembunyi
     document.getElementById('pdfContent').innerHTML = html;
-
-    // Menjalankan library html2pdf
     let element = document.getElementById('pdfContent');
     let opt = {
-      margin:       10, // Margin halaman 10mm
-      filename:     'Asesmen_IKPR_' + d[2] + '_' + d[3] + '.pdf',
+      margin:       10,
+      filename:     'Asesmen_IKPR_' + d[3] + '_' + d[2] + '.pdf',
       image:        { type: 'jpeg', quality: 0.98 },
       html2canvas:  { scale: 2, useCORS: true },
       jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
-    
     html2pdf().set(opt).from(element).save();
   }
 
-  // ----- LOGIC UPDATE & DELETE -----
   function deleteData(id) {
-    if(!confirm("Yakin ingin menghapus data asesmen dengan ID: " + id + " ?")) return;
-    fetch(API_URL, { method: 'POST', redirect: 'follow', headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "delete", id: id }) })
+    let noreg = globalDataMap[id][3]; // MENGGUNAKAN NO REGISTER
+    if(!confirm("Yakin ingin menghapus data asesmen dengan No. Register: " + noreg + " ?")) return;
+    fetch(API_URL, { method: 'POST', redirect: 'follow', headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "delete", id: noreg }) })
     .then(r => r.json()).then(r => { alert(r.message); loadDataList(); });
   }
 
   function editData(id) {
     let d = globalDataMap[id];
     if(!d) return alert("Data tidak valid di memory.");
-    activeEditId = id; 
+    
+    // MENGGUNAKAN NO REGISTER SEBAGAI KUNCI UPDATE
+    activeEditNoreg = d[3]; 
+    
     document.getElementById('editAlert').classList.remove('d-none');
-    document.getElementById('editIdLabel').innerText = id;
+    document.getElementById('editIdLabel').innerText = activeEditNoreg;
     
     document.querySelector('[data-bs-target="#tabForm"]').click();
     document.querySelector('[data-bs-target="#f_tab0"]').click();
@@ -549,7 +466,7 @@
   }
 
   function resetFormForNew() {
-    activeEditId = null;
+    activeEditNoreg = null;
     document.getElementById('editAlert').classList.add('d-none');
     document.getElementById('formAsesmen').reset();
     let btn = document.getElementById('btnSimpan');
@@ -592,8 +509,9 @@
     for(let i=1; i<=3; i++) arr.push(document.getElementById('m4d_'+i).value);
     ['val_skorM4D','val_gt','val_kat','val_klaster','val_tpp'].forEach(id => arr.push(document.getElementById(id).value));
 
-    let payloadConfig = activeEditId 
-        ? { action: "update", id: activeEditId, payload: arr } 
+    // MENGIRIM PAYLOAD DENGAN ID MENGGUNAKAN NO. REGISTER
+    let payloadConfig = activeEditNoreg 
+        ? { action: "update", id: activeEditNoreg, payload: arr } 
         : { action: "save", payload: arr };
 
     fetch(API_URL, { method: 'POST', redirect: 'follow', headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payloadConfig) })
@@ -605,7 +523,7 @@
       loadDataList(); 
     }).catch(err => {
       alert("Error: " + err);
-      btn.disabled = false; btn.innerText = activeEditId ? "🔄 UPDATE DATA ASESMEN" : "💾 SIMPAN DATA BARU";
+      btn.disabled = false; btn.innerText = activeEditNoreg ? "🔄 UPDATE DATA ASESMEN" : "💾 SIMPAN DATA BARU";
     });
   }
 </script>
