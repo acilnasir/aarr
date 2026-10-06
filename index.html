@@ -2,9 +2,16 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Aplikasi Asesmen Narapidana - IKP-R CRUD</title>
+  <title>Aplikasi Asesmen Narapidana - IKP-R CRUD & Cetak</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <!-- Library untuk Generate Word (.docx) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/docxtemplater/3.37.11/docxtemplater.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pizzip/3.1.4/pizzip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pizzip/3.1.4/pizzip-utils.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
   <style>
     .form-label { font-weight: 600; font-size: 0.9rem; margin-top: 10px; }
     .section-title { background: #0D3B66; color: white; padding: 8px 15px; border-radius: 4px; margin-top: 25px; }
@@ -31,14 +38,13 @@
 <!-- DIV APLIKASI UTAMA -->
 <div class="container-fluid py-3 px-4" id="appSection" style="display:none;">
   <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
-    <h4>Sistem Asesmen IKP-R (CRUD)</h4>
+    <h4>Sistem Asesmen IKP-R</h4>
     <div>
       <span id="userInfo" class="badge bg-secondary me-2"></span>
       <button class="btn btn-sm btn-outline-danger" onclick="location.reload()">Keluar</button>
     </div>
   </div>
 
-  <!-- NAV TABS UTAMA -->
   <ul class="nav nav-tabs" id="mainTabs">
     <li class="nav-item">
       <button class="nav-link active fw-bold text-primary" data-bs-toggle="tab" data-bs-target="#tabDashboard" type="button" onclick="loadDataList()">📋 Data Asesmen</button>
@@ -50,7 +56,7 @@
 
   <div class="tab-content bg-white p-4 border border-top-0 shadow-sm">
     
-    <!-- ================== TAB DASHBOARD (LIST DATA) ================== -->
+    <!-- ================== TAB DASHBOARD ================== -->
     <div class="tab-pane fade show active" id="tabDashboard">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="m-0">Daftar Hasil Asesmen Narapidana</h5>
@@ -228,7 +234,7 @@
             </div>
             
             <hr class="mt-5">
-            <button type="button" class="btn btn-primary btn-lg w-100 shadow" id="btnSimpan" onclick="submitData()">💾 SIMPAN DATA BARU</button>
+            <button type="button" class="btn btn-primary btn-lg w-100 shadow" id="btnSimpan" onclick="submitData()">💾 SIMPAN DATA</button>
           </div>
 
         </div>
@@ -239,19 +245,18 @@
 </div>
 
 <script>
-  // PENTING: JANGAN LUPA URL WEB APP HARUS SAMA DENGAN PERMINTAAN ANDA
+  // PENTING: URL Web App Anda
   const API_URL = "https://script.google.com/macros/s/AKfycbzo3IGnkOBHLLDtP_FD4rnnXC81rq6S0OuC_vI0FQ-mQXa0TLwLIRqC-1Ix86NbgGtN/exec"; 
 
   let asr = "";
-  let globalDataMap = {}; // Untuk simpan data sementara
-  let activeEditId = null; // Menyimpan ID baris yang sedang diedit
+  let globalDataMap = {}; 
+  let activeEditId = null; 
 
   const list_m1 = ["1. Pakai > rencana", "2. Gagal berhenti", "3. Waktu tersita", "4. Craving", "5. Gagal kewajiban", "6. Mslh sosial", "7. Mningglkn hobi", "8. Situasi bhya", "9. Mslh fisik/mental", "10. Toleransi dosis", "11. Gejala putus zat"];
   const list_m4a = ["A1 Padi", "A2 Sayur", "A3 Alat Tani", "B1 Tambak", "B2 Kapal", "B3 Olah Ikan", "C1 Mekanik", "C2 Pertukangan", "C3 Alat", "D1 Memasak", "D2 Gudang", "D3 Menjahit", "E1 Adm", "E2 Laundry/Jasa", "E3 Komputer"];
   const list_m4b = ["1. Ingin berhenti.", "2. Sadar rugi.", "3. Sedia tes urin.", "4. Tdk perlu ubah(R).", "5. Mau kerja keras.", "6. Mau belajar.", "7. Sedia ikut aturan.", "8. Ikut agar bebas(R).", "9. Punya rencana.", "10. Tau hindari.", "11. Yakin bersih.", "12. Keluarga dukung."];
 
   window.onload = function() {
-    // Generate DOM
     let htmlM1 = ""; list_m1.forEach((q, i) => htmlM1 += `<div class="col-md-6"><div class="form-check"><input class="form-check-input m1-cek" type="checkbox" id="m1_g${i+1}" value="Ya" onchange="calcTotal()"><label class="form-check-label">${q}</label></div></div>`); document.getElementById('m1_gejala_container').innerHTML = htmlM1;
     let html4a = `<tr class="table-light"><th>Pernyataan (0,1,2)</th><th style="width:80px;">Pilihan</th></tr>`; list_m4a.forEach((q, i) => html4a += `<tr><td>${q}</td><td><select class="form-select form-select-sm m4a-val" id="m4a_${i+1}" onchange="calcTotal()"><option value="0">0</option><option value="1">1</option><option value="2">2</option></select></td></tr>`); document.getElementById('tabel4a').innerHTML = html4a;
     let html4b = `<tr class="table-light"><th>Pernyataan (1-4)</th><th style="width:80px;">Pilihan</th></tr>`; list_m4b.forEach((q, i) => html4b += `<tr><td>${q}</td><td><select class="form-select form-select-sm m4b-val" id="m4b_${i+1}" onchange="calcTotal()"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option></select></td></tr>`); document.getElementById('tabel4b').innerHTML = html4b;
@@ -259,50 +264,21 @@
   };
 
   // ----- LOGIC AUTH & READ -----
-function doLogin() {
-  let btn = document.querySelector('#formLogin button'); 
-  btn.innerText = "Memeriksa..."; 
-  btn.disabled = true;
-  
-  let u = document.getElementById('username').value;
-  let p = document.getElementById('password').value;
-
-  fetch(API_URL, {
-    method: 'POST',
-    redirect: 'follow', // Wajib untuk Google Apps Script
-    headers: {
-      "Content-Type": "text/plain;charset=utf-8" // Mencegah blokir CORS Preflight
-    },
-    body: JSON.stringify({ action: "login", username: u, password: p })
-  })
-  .then(response => response.text()) // Baca sebagai teks dulu
-  .then(text => {
-    try {
-      let r = JSON.parse(text); // Coba ubah teks menjadi JSON
-      if(r.success) {
-        asr = r.user.nama; 
-        document.getElementById('loginSection').style.display = 'none';
-        document.getElementById('appSection').style.display = 'block';
-        document.getElementById('userInfo').innerText = asr;
-        loadDataList();
-      } else {
-        alert(r.message); 
-        btn.innerText = "Masuk"; btn.disabled = false;
-      }
-    } catch(err) {
-      // Jika server membalas dengan HTML (Error dari Google), tampilkan peringatan ini
-      alert("Error Server: Pastikan Anda sudah Deploy Apps Script sebagai 'Versi Baru'.\nRespons server: " + text.substring(0, 80));
-      btn.innerText = "Masuk"; btn.disabled = false;
-    }
-  }).catch(err => {
-    alert("Koneksi gagal. Cek internet Anda. Error: " + err);
-    btn.innerText = "Masuk"; btn.disabled = false;
-  });
-}
+  function doLogin() {
+    let btn = document.querySelector('#formLogin button'); btn.innerText = "Memeriksa..."; btn.disabled = true;
+    fetch(API_URL, { method: 'POST', redirect: 'follow', headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "login", username: document.getElementById('username').value, password: document.getElementById('password').value }) })
+    .then(r => r.text()).then(text => {
+      try {
+        let r = JSON.parse(text);
+        if(r.success) { asr = r.user.nama; document.getElementById('loginSection').style.display = 'none'; document.getElementById('appSection').style.display = 'block'; document.getElementById('userInfo').innerText = asr; loadDataList(); }
+        else { alert(r.message); btn.innerText = "Masuk"; btn.disabled = false; }
+      } catch(e) { alert("Error API. Cek konfigurasi Deployment Google Apps Script."); btn.innerText = "Masuk"; btn.disabled = false; }
+    }).catch(e => { alert("Error: " + e); btn.innerText = "Masuk"; btn.disabled = false; });
+  }
 
   function loadDataList() {
     let tbody = document.getElementById('dataTableBody'); tbody.innerHTML = `<tr><td colspan="8" class="text-center">Mengambil data dari Server...</td></tr>`;
-    fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: "read" }) })
+    fetch(API_URL, { method: 'POST', redirect: 'follow', headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "read" }) })
     .then(r => r.json()).then(r => {
       if(r.success && r.data.length > 0) {
         tbody.innerHTML = ""; globalDataMap = {};
@@ -314,35 +290,59 @@ function doLogin() {
             <td>${row[4]}</td><td><span class="badge bg-secondary">${row[101]}</span></td>
             <td><span class="badge ${row[102]==='LAYAK'?'bg-primary':row[102].includes('BERSYARAT')?'bg-warning text-dark':'bg-danger'}">${row[102]}</span></td>
             <td>
+              <button class="btn btn-sm btn-success" onclick="cetakData('${id}')">🖨️ Cetak</button>
               <button class="btn btn-sm btn-primary" onclick="editData('${id}')">✏️ Edit</button>
               <button class="btn btn-sm btn-danger" onclick="deleteData('${id}')">🗑️ Hapus</button>
             </td>
           </tr>`;
           tbody.innerHTML += tr;
         });
-      } else { tbody.innerHTML = `<tr><td colspan="8" class="text-center">Belum ada data / gagal mengambil.</td></tr>`; }
+      } else { tbody.innerHTML = `<tr><td colspan="8" class="text-center">Belum ada data.</td></tr>`; }
+    });
+  }
+
+  // ----- LOGIC CETAK (WORD) -----
+  function cetakData(id) {
+    let d = globalDataMap[id];
+    if (!d) return alert("Data tidak valid.");
+
+    PizZipUtils.getBinaryContent("template.docx", function(error, content) {
+      if (error) {
+        alert("Gagal memuat template. Pastikan file 'template.docx' sudah diunggah berdampingan dengan index.html di Vercel.");
+        return;
+      }
+      let zip = new PizZip(content);
+      let doc = new window.docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+
+      doc.render({
+        nama: d[2], noreg: d[3], upt: d[4], ttl: d[5], usia: d[6], tgl_asesmen: d[7], pasal: d[8], lama_pidana: d[9],
+        skor_m1: d[43], kesimpulan_m1: d[46],
+        skor_m2: d[52], skor_m3: d[58], skor_m4a: d[76], skor_m4b: d[90], skor_m4c: d[96], skor_m4d: d[100],
+        skor_total: d[101], kategori_hasil: d[102], rekomendasi_klaster: d[103], keputusan_tpp: d[104], asesor: d[1]
+      });
+
+      let out = doc.getZip().generate({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+      saveAs(out, "IKPR_" + d[2] + ".docx");
     });
   }
 
   // ----- LOGIC UPDATE & DELETE -----
   function deleteData(id) {
     if(!confirm("Yakin ingin menghapus data asesmen dengan ID: " + id + " ?")) return;
-    fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: "delete", id: id }) })
+    fetch(API_URL, { method: 'POST', redirect: 'follow', headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "delete", id: id }) })
     .then(r => r.json()).then(r => { alert(r.message); loadDataList(); });
   }
 
   function editData(id) {
     let d = globalDataMap[id];
     if(!d) return alert("Data tidak valid di memory.");
-    activeEditId = id;
+    activeEditId = id; // Set Active ID
     document.getElementById('editAlert').classList.remove('d-none');
     document.getElementById('editIdLabel').innerText = id;
     
-    // Switch to Form Tab
     document.querySelector('[data-bs-target="#tabForm"]').click();
     document.querySelector('[data-bs-target="#f_tab0"]').click();
     
-    // Unpack data based on the exact index order mapped during save
     let textFields = ['id_nama','id_noreg','id_upt','id_ttl','id_usia','id_tglasesmen','id_pasal','id_lamapidana',
       'm0_1','m0_2','m0_3','m0_4','m0_5','m0_6','m0_7','m0_8','m0_9','m0_hasil',
       'm1_pasal','m1_bb','m1_peran','m1_tat','m1_urin',
@@ -361,7 +361,7 @@ function doLogin() {
     
     ['val_skorM4D','val_gt','val_kat','val_klaster','val_tpp'].forEach((tid, i) => document.getElementById(tid).value = d[i+100] || "");
     
-    calcTotal(); // Force recalculate UI views
+    calcTotal(); 
     
     let btn = document.getElementById('btnSimpan');
     btn.innerText = "🔄 UPDATE DATA ASESMEN";
@@ -378,7 +378,6 @@ function doLogin() {
     calcTotal();
   }
 
-  // ----- LOGIC KALKULASI & SAVE/UPDATE -----
   function calcTotal() {
     let sk1 = document.querySelectorAll('.m1-cek:checked').length; document.getElementById('skorM1').innerText = sk1; document.getElementById('val_skorM1').value = sk1;
     let sk3 = 0; document.querySelectorAll('.m3-val').forEach(e => sk3 += parseInt(e.value)||0); document.getElementById('skorM3_view').innerText = sk3; document.getElementById('val_skorM3').value = sk3;
@@ -398,7 +397,6 @@ function doLogin() {
   function submitData() {
     let btn = document.getElementById('btnSimpan'); btn.disabled = true; btn.innerText = "Menyimpan ke Server...";
     
-    // Packing the massive Array Payload exactly same logic
     let arr = [ asr, document.getElementById('id_nama').value, document.getElementById('id_noreg').value, document.getElementById('id_upt').value, document.getElementById('id_ttl').value, document.getElementById('id_usia').value, document.getElementById('id_tglasesmen').value, document.getElementById('id_pasal').value, document.getElementById('id_lamapidana').value,
       document.getElementById('m0_1').value, document.getElementById('m0_2').value, document.getElementById('m0_3').value, document.getElementById('m0_4').value, document.getElementById('m0_5').value, document.getElementById('m0_6').value, document.getElementById('m0_7').value, document.getElementById('m0_8').value, document.getElementById('m0_9').value, document.getElementById('m0_hasil').value,
       document.getElementById('m1_pasal').value, document.getElementById('m1_bb').value, document.getElementById('m1_peran').value, document.getElementById('m1_tat').value, document.getElementById('m1_urin').value, document.getElementById('m1_zat').value, document.getElementById('m1_usia').value, document.getElementById('m1_lama').value, document.getElementById('m1_frek').value, document.getElementById('m1_cara').value, document.getElementById('m1_terakhir').value, document.getElementById('m1_rehab').value, document.getElementById('m1_berhenti').value
@@ -414,18 +412,18 @@ function doLogin() {
     for(let i=1; i<=3; i++) arr.push(document.getElementById('m4d_'+i).value);
     ['val_skorM4D','val_gt','val_kat','val_klaster','val_tpp'].forEach(id => arr.push(document.getElementById(id).value));
 
-    // Menentukan Action: Save (Create) atau Update
+    // Eksekusi Simpan atau Edit (Mengirim ID)
     let payloadConfig = activeEditId 
         ? { action: "update", id: activeEditId, payload: arr } 
         : { action: "save", payload: arr };
 
-    fetch(API_URL, { method: 'POST', body: JSON.stringify(payloadConfig) })
+    fetch(API_URL, { method: 'POST', redirect: 'follow', headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payloadConfig) })
     .then(r => r.json()).then(r => {
       alert(r.message); 
       btn.disabled = false; 
-      resetFormForNew(); // Kembalikan form ke keadaan kosong
-      document.querySelector('[data-bs-target="#tabDashboard"]').click(); // Kembali ke tab List Data
-      loadDataList(); // Refresh tabel List Data otomatis
+      resetFormForNew(); 
+      document.querySelector('[data-bs-target="#tabDashboard"]').click(); 
+      loadDataList(); 
     }).catch(err => {
       alert("Error: " + err);
       btn.disabled = false; btn.innerText = activeEditId ? "🔄 UPDATE DATA ASESMEN" : "💾 SIMPAN DATA BARU";
