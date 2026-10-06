@@ -259,14 +259,46 @@
   };
 
   // ----- LOGIC AUTH & READ -----
-  function doLogin() {
-    let btn = document.querySelector('#formLogin button'); btn.innerText = "Mengecek..."; btn.disabled = true;
-    fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: "login", username: document.getElementById('username').value, password: document.getElementById('password').value }) })
-    .then(r => r.json()).then(r => {
-      if(r.success) { asr = r.user.nama; document.getElementById('loginSection').style.display = 'none'; document.getElementById('appSection').style.display = 'block'; document.getElementById('userInfo').innerText = asr; loadDataList(); }
-      else { alert(r.message); btn.innerText = "Masuk"; btn.disabled = false; }
-    }).catch(e => { alert("Error: " + e); btn.innerText = "Masuk"; btn.disabled = false; });
-  }
+function doLogin() {
+  let btn = document.querySelector('#formLogin button'); 
+  btn.innerText = "Memeriksa..."; 
+  btn.disabled = true;
+  
+  let u = document.getElementById('username').value;
+  let p = document.getElementById('password').value;
+
+  fetch(API_URL, {
+    method: 'POST',
+    redirect: 'follow', // Wajib untuk Google Apps Script
+    headers: {
+      "Content-Type": "text/plain;charset=utf-8" // Mencegah blokir CORS Preflight
+    },
+    body: JSON.stringify({ action: "login", username: u, password: p })
+  })
+  .then(response => response.text()) // Baca sebagai teks dulu
+  .then(text => {
+    try {
+      let r = JSON.parse(text); // Coba ubah teks menjadi JSON
+      if(r.success) {
+        asr = r.user.nama; 
+        document.getElementById('loginSection').style.display = 'none';
+        document.getElementById('appSection').style.display = 'block';
+        document.getElementById('userInfo').innerText = asr;
+        loadDataList();
+      } else {
+        alert(r.message); 
+        btn.innerText = "Masuk"; btn.disabled = false;
+      }
+    } catch(err) {
+      // Jika server membalas dengan HTML (Error dari Google), tampilkan peringatan ini
+      alert("Error Server: Pastikan Anda sudah Deploy Apps Script sebagai 'Versi Baru'.\nRespons server: " + text.substring(0, 80));
+      btn.innerText = "Masuk"; btn.disabled = false;
+    }
+  }).catch(err => {
+    alert("Koneksi gagal. Cek internet Anda. Error: " + err);
+    btn.innerText = "Masuk"; btn.disabled = false;
+  });
+}
 
   function loadDataList() {
     let tbody = document.getElementById('dataTableBody'); tbody.innerHTML = `<tr><td colspan="8" class="text-center">Mengambil data dari Server...</td></tr>`;
