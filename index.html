@@ -6,7 +6,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   
-  <!-- Library untuk Generate PDF (html2pdf) -->
+  <!-- Library untuk Generate PDF Terstruktur -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
   <style>
@@ -14,61 +14,126 @@
     .section-title { background: #0D3B66; color: white; padding: 8px 15px; border-radius: 4px; margin-top: 25px; }
     .table-radio td { text-align: center; vertical-align: middle; }
     .table-radio th { font-size: 0.9rem; }
+    
+    /* CSS Khusus Layout Cetak PDF */
+    .pdf-table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 11px; font-family: Arial, sans-serif; }
+    .pdf-table th, .pdf-table td { border: 1px solid #000; padding: 4px 6px; }
+    .pdf-table th { background-color: #f0f0f0; }
+    .pdf-header { font-weight: bold; background-color: #d9e1f2; margin-top: 15px; padding: 5px; font-size: 12px; font-family: Arial, sans-serif; border: 1px solid #000; }
   </style>
 </head>
 <body class="bg-light">
 
-<!-- WADAH TEMPLATE PDF (Disembunyikan dari layar agar tidak mengganggu UI) -->
-<div id="pdfContainer" style="position: absolute; top: -9999px; left: -9999px; width: 800px; background: white;">
-  <div id="pdfContent" style="padding: 40px; font-family: 'Times New Roman', Times, serif; color: #000; line-height: 1.5;">
-    <h3 style="text-align: center; margin-bottom: 5px;">IKP-R Draf 1</h3>
-    <h5 style="text-align: center; font-weight: bold; margin-top: 0;">INSTRUMEN KELAYAKAN DAN PENEMPATAN REHABILITASI DAN RE-EDUKASI NARAPIDANA PENGGUNA NAPZA BERBASIS KETAHANAN PANGAN</h5>
-    <hr style="border: 2px solid black; margin-bottom: 20px;">
-    
-    <h4 style="font-weight: bold;">BAGIAN B. FORMULIR ASESMEN (SATU BERKAS PER NAPI)</h4>
-    
-    <h5 style="font-weight: bold; margin-top: 20px;">B.0 Identitas dan Modul 0: Skrinning Awal</h5>
-    <ul style="list-style-type: square;">
-      <li><strong>Nama:</strong> <span id="pdf_nama"></span></li>
-      <li><strong>No. register / ID SDP:</strong> <span id="pdf_noreg"></span></li>
-      <li><strong>UPT / Kanwil:</strong> <span id="pdf_upt"></span></li>
-      <li><strong>Tempat, tgl lahir:</strong> <span id="pdf_ttl"></span></li>
-      <li><strong>Usia saat asesmen:</strong> <span id="pdf_usia"></span> Tahun</li>
-      <li><strong>Tanggal asesmen:</strong> <span id="pdf_tgl_asesmen"></span></li>
-      <li><strong>Pasal dan perkara:</strong> <span id="pdf_pasal"></span></li>
-      <li><strong>Lama pidana:</strong> <span id="pdf_lama_pidana"></span></li>
-      <li><strong>Nama asesor:</strong> <span id="pdf_asesor"></span></li>
-    </ul>
+<!-- ================== WADAH TEMPLATE PDF (Tersembunyi) ================== -->
+<div id="pdfWrapper" style="position: absolute; left: -9999px; top: 0; width: 800px; background: #fff; z-index: -1;">
+  <div id="pdfContent" style="padding: 20px 30px; color: #000; font-family: Arial, sans-serif;">
+    <h3 style="text-align: center; font-weight: bold; margin-bottom: 5px; font-size: 18px;">IKP-R Draf 1</h3>
+    <h4 style="text-align: center; font-size: 14px; margin-top: 0;">INSTRUMEN KELAYAKAN DAN PENEMPATAN REHABILITASI DAN RE-EDUKASI</h4>
+    <hr style="border: 1px solid black; margin-bottom: 10px;">
 
-    <h5 style="font-weight: bold; margin-top: 20px;">B.5 REKAP SKOR DAN KEPUTUSAN</h5>
-    <ul style="list-style-type: square;">
-      <li><strong>Skor Gejala Modul 1:</strong> <span id="pdf_skor_m1"></span></li>
-      <li><strong>Kesimpulan Kategori Modul 1:</strong> <span id="pdf_kesimpulan_m1"></span></li>
-      <li><strong>Skor Modul 2 (Kesiapan Fisik dan Mental):</strong> <span id="pdf_skor_m2"></span></li>
-      <li><strong>Skor Modul 3 (Risiko dan Stabilitas):</strong> <span id="pdf_skor_m3"></span></li>
-      <li><strong>Skor Modul 4A (Minat dan Bakat):</strong> <span id="pdf_skor_m4a"></span></li>
-      <li><strong>Skor Modul 4B (Motivasi dan Kesiapan Berubah):</strong> <span id="pdf_skor_m4b"></span></li>
-      <li><strong>Skor Modul 4C (Sikap Kerja):</strong> <span id="pdf_skor_m4c"></span></li>
-      <li><strong>Skor Modul 4D (Kapasitas Kerja):</strong> <span id="pdf_skor_m4d"></span></li>
-    </ul>
+    <!-- B.0 IDENTITAS & MODUL 0 -->
+    <div class="pdf-header">B.0 IDENTITAS NARAPIDANA & MODUL 0 (SKRINNING AWAL)</div>
+    <table class="pdf-table">
+       <tr><td width="20%">Nama</td><td width="30%" id="p_nama"></td><td width="20%">No. Register</td><td width="30%" id="p_noreg"></td></tr>
+       <tr><td>UPT / Kanwil</td><td id="p_upt"></td><td>Tempat, Tgl Lahir</td><td id="p_ttl"></td></tr>
+       <tr><td>Usia</td><td id="p_usia"></td><td>Tgl Asesmen</td><td id="p_tgl"></td></tr>
+       <tr><td>Pasal & Perkara</td><td id="p_pasal"></td><td>Lama Pidana</td><td id="p_lama"></td></tr>
+    </table>
+    <table class="pdf-table">
+       <tr><td width="50%">0.1 Usia 20-40 Tahun</td><td id="p_m0_1"></td><td width="25%">0.6 Register F</td><td id="p_m0_6"></td></tr>
+       <tr><td>0.2 Bukan Pidana Mati / Seumur Hidup</td><td id="p_m0_2"></td><td>0.7 Jarak 2/3 Pidana</td><td id="p_m0_7"></td></tr>
+       <tr><td>0.3 Bukan Bandar (Putusan)</td><td id="p_m0_3"></td><td>0.8 Tdk Ada Kasus Lain</td><td id="p_m0_8"></td></tr>
+       <tr><td>0.4 Bukan Pengecualian Kasus</td><td id="p_m0_4"></td><td>0.9 Bersedia Ikut</td><td id="p_m0_9"></td></tr>
+       <tr><td>0.5 Bukan Perlindungan Anak</td><td id="p_m0_5"></td><td><b>HASIL MODUL 0</b></td><td id="p_m0_hasil" style="font-weight:bold; background-color:#ffffcc;"></td></tr>
+    </table>
 
-    <h5 style="font-weight: bold; margin-top: 20px;">HASIL KEPUTUSAN AKHIR</h5>
-    <ul style="list-style-type: square;">
-      <li><strong>JUMLAH TOTAL SKOR IKP-R:</strong> <strong id="pdf_skor_total" style="font-size: 1.2em;"></strong></li>
-      <li><strong>KATEGORI HASIL SISTEM:</strong> <strong id="pdf_kategori_hasil" style="font-size: 1.2em;"></strong></li>
-      <li><strong>Rekomendasi Klaster Pekerjaan:</strong> <span id="pdf_rekomendasi_klaster"></span></li>
-      <li><strong>Keputusan Sidang TPP UPT:</strong> <span id="pdf_keputusan_tpp"></span></li>
-    </ul>
+    <!-- MODUL 1 -->
+    <div class="pdf-header">MODUL 1: VERIFIKASI STATUS PENGGUNA NARKOTIKA</div>
+    <table class="pdf-table">
+       <tr><td width="20%">Pasal Didakwa</td><td id="p_m1_pasal"></td><td width="20%">Berat BB</td><td id="p_m1_bb"></td></tr>
+       <tr><td>Peran</td><td id="p_m1_peran"></td><td>TAT BNN/ASSIST</td><td id="p_m1_tat"></td></tr>
+       <tr><td>Tes Urin</td><td id="p_m1_urin" colspan="3"></td></tr>
+    </table>
+    <table class="pdf-table">
+       <tr><td width="20%">Zat Utama</td><td id="p_m1_zat"></td><td width="20%">Usia Pertama</td><td id="p_m1_usia"></td></tr>
+       <tr><td>Lama Rutin</td><td id="p_m1_lama"></td><td>Frekuensi</td><td id="p_m1_frek"></td></tr>
+       <tr><td>Cara Pakai</td><td id="p_m1_cara"></td><td>Pakai Terakhir</td><td id="p_m1_akhir"></td></tr>
+       <tr><td>Pernah Rehab</td><td id="p_m1_rehab"></td><td>Coba Berhenti</td><td id="p_m1_berhenti"></td></tr>
+    </table>
+    <div style="page-break-inside: avoid;">
+      <b>Daftar 11 Gejala Penggunaan Zat:</b>
+      <table class="pdf-table"><tbody id="pdf_tbody_m1"></tbody></table>
+      <table class="pdf-table">
+         <tr><td width="25%">Skor Gejala (Maks 11)</td><td id="p_m1_skor" style="font-weight:bold;"></td><td width="25%">Triangulasi</td><td id="p_m1_tri"></td></tr>
+         <tr><td>Indikasi Red Flag</td><td id="p_m1_red"></td><td><b>Kategori Modul 1</b></td><td id="p_m1_kat" style="font-weight:bold; background-color:#e2efda;"></td></tr>
+      </table>
+    </div>
 
-    <p style="margin-top: 30px;"><strong>Pernyataan asesor.</strong> Saya melaksanakan asesmen ini sesuai pedoman, tidak menerima imbalan dalam bentuk apa pun, dan tidak memiliki hubungan kepentingan dengan warga binaan yang dinilai.</p>
+    <div class="html2pdf__page-break"></div>
+
+    <!-- MODUL 2 & 3 -->
+    <div class="pdf-header">MODUL 2: FISIK & MEDIS | MODUL 3: RISIKO & STABILITAS</div>
+    <table class="pdf-table">
+       <tr><th colspan="4" width="50%">MODUL 2 (Oleh Tenaga Kesehatan)</th><th colspan="2" width="50%">MODUL 3 (Data SDP)</th></tr>
+       <tr><td width="15%">Tensi</td><td width="10%" id="p_m2_td"></td><td width="15%">Nadi</td><td width="10%" id="p_m2_nadi"></td><td width="25%">3.1 RRI</td><td width="25%" id="p_m3_1"></td></tr>
+       <tr><td>Suhu</td><td id="p_m2_suhu"></td><td>BB (kg)</td><td id="p_m2_bb"></td><td>3.2 Screening</td><td id="p_m3_2"></td></tr>
+       <tr><td>TB (cm)</td><td id="p_m2_tb"></td><td colspan="2"></td><td>3.3 Riwayat Kabur</td><td id="p_m3_3"></td></tr>
+       <tr><td colspan="2"><b>Kesimpulan M2</b></td><td colspan="2" id="p_m2_kes" style="font-weight:bold;"></td><td>3.4 Catatan Kekerasan</td><td id="p_m3_4"></td></tr>
+       <tr><td colspan="4"></td><td>3.5 Pembinaan</td><td id="p_m3_5"></td></tr>
+       <tr><td colspan="4"></td><td><b>Skor Modul 3 (Maks 20)</b></td><td id="p_m3_skor" style="font-weight:bold;"></td></tr>
+    </table>
+
+    <!-- MODUL 4 -->
+    <div class="pdf-header">MODUL 4: MINAT, BAKAT, MOTIVASI, SIKAP & KAPASITAS KERJA</div>
+    <div style="display: flex; gap: 15px;">
+       <div style="width: 50%;">
+         <b>4A. Minat & Bakat (0=Tidak, 1=Biasa, 2=Sangat)</b>
+         <table class="pdf-table"><tbody id="pdf_tbody_m4a"></tbody></table>
+         <table class="pdf-table"><tr><td>4A.2 Pengalaman</td><td id="p_m4a_peng"></td><td>4A.3 Kesediaan</td><td id="p_m4a_kes"></td></tr><tr><td colspan="2"><b>Total Poin 4A (Maks 13)</b></td><td colspan="2" id="p_m4a_skor" style="font-weight:bold;"></td></tr></table>
+       </div>
+       <div style="width: 50%;">
+         <b>4B. Motivasi Berubah (1=STS, 2=TS, 3=S, 4=SS)</b>
+         <table class="pdf-table"><tbody id="pdf_tbody_m4b"></tbody></table>
+         <table class="pdf-table"><tr><td>Skor Mentah</td><td id="p_m4b_mth"></td><td><b>Konversi 4B (Maks 25)</b></td><td id="p_m4b_konv" style="font-weight:bold;"></td></tr></table>
+       </div>
+    </div>
     
-    <div style="text-align: right; margin-top: 40px; margin-right: 50px;">
-      <p>Tanda Tangan Asesor,</p>
-      <br><br><br>
-      <p>( <strong id="pdf_ttd_asesor"></strong> )</p>
+    <div style="page-break-inside: avoid;">
+      <table class="pdf-table">
+         <tr><th colspan="2">4C. Sikap Kerja (Skala 1-5)</th><th colspan="2">4D. Kapasitas Kerja (Skala 0-2)</th></tr>
+         <tr><td width="30%">4C.1 Disiplin & Waktu</td><td width="20%" id="p_m4c_1"></td><td width="30%">4D.1 Tahan Fisik</td><td width="20%" id="p_m4d_1"></td></tr>
+         <tr><td>4C.2 Tanggung Jawab</td><td id="p_m4c_2"></td><td>4D.2 Riwayat Kerja</td><td id="p_m4d_2"></td></tr>
+         <tr><td>4C.3 Kerja Sama</td><td id="p_m4c_3"></td><td>4D.3 Tugas Praktik</td><td id="p_m4d_3"></td></tr>
+         <tr><td>4C.4 Tahan Emosi</td><td id="p_m4c_4"></td><td colspan="2"></td></tr>
+         <tr><td>4C.5 Kepatuhan</td><td id="p_m4c_5"></td><td colspan="2"></td></tr>
+         <tr><td><b>Skor Modul 4C (Maks 25)</b></td><td id="p_m4c_skor" style="font-weight:bold;"></td><td><b>Skor Modul 4D (Maks 6)</b></td><td id="p_m4d_skor" style="font-weight:bold;"></td></tr>
+      </table>
+    </div>
+
+    <!-- B.5 REKAP KEPUTUSAN -->
+    <div class="pdf-header">B.5 REKAP SKOR DAN KEPUTUSAN AKHIR</div>
+    <table class="pdf-table" style="font-size: 13px;">
+       <tr><td width="50%"><b>JUMLAH TOTAL SKOR IKP-R (Maks 98)</b></td><td id="p_gt" style="font-weight:bold; font-size:16px; text-align:center;"></td></tr>
+       <tr><td><b>KATEGORI HASIL SISTEM</b></td><td id="p_kat" style="font-weight:bold; font-size:16px; text-align:center; color:#0D3B66;"></td></tr>
+       <tr><td>Rekomendasi Klaster Kegiatan</td><td id="p_klaster" style="text-align:center;"></td></tr>
+       <tr><td>Keputusan Sidang TPP UPT</td><td id="p_tpp" style="text-align:center;"></td></tr>
+    </table>
+    
+    <div style="margin-top: 30px; font-size: 12px; page-break-inside: avoid;">
+       <p><b>Pernyataan Asesor.</b> Saya melaksanakan asesmen ini sesuai pedoman, tidak menerima imbalan dalam bentuk apa pun, dan tidak memiliki hubungan kepentingan dengan warga binaan yang dinilai.</p>
+       <table style="width: 100%; text-align: center; margin-top: 20px; border:none;">
+          <tr><td style="border:none;" width="50%"></td>
+            <td style="border:none;" width="50%">
+               Tanda Tangan Asesor<br><br><br><br>
+               ( <b id="p_asesor"></b> )
+            </td>
+          </tr>
+       </table>
     </div>
   </div>
 </div>
+<!-- ====================================================================== -->
+
 
 <!-- DIV LOGIN -->
 <div class="container py-5" id="loginSection" style="max-width: 400px;">
@@ -104,8 +169,7 @@
   </ul>
 
   <div class="tab-content bg-white p-4 border border-top-0 shadow-sm">
-    
-    <!-- ================== TAB DASHBOARD ================== -->
+    <!-- TAB DASHBOARD -->
     <div class="tab-pane fade show active" id="tabDashboard">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="m-0">Daftar Hasil Asesmen Narapidana</h5>
@@ -115,8 +179,8 @@
         <table class="table table-bordered table-hover align-middle">
           <thead class="table-dark">
             <tr>
-              <th>ID/Waktu</th><th>Asesor</th><th>No. Register</th><th>Nama Narapidana</th>
-              <th>UPT</th><th>Skor</th><th>Kategori Akhir</th><th>Aksi</th>
+              <th>ID/Waktu</th><th>Asesor</th><th>No. Register</th><th>Nama Napi</th>
+              <th>UPT</th><th>Skor</th><th>Kategori Akhir</th><th style="min-width:200px;">Aksi</th>
             </tr>
           </thead>
           <tbody id="dataTableBody">
@@ -126,7 +190,7 @@
       </div>
     </div>
 
-    <!-- ================== TAB FORM INPUT / EDIT ================== -->
+    <!-- TAB FORM INPUT / EDIT -->
     <div class="tab-pane fade" id="tabForm">
       <div class="alert alert-warning d-none" id="editAlert">
         <strong>Mode Edit:</strong> Sedang mengubah data ID <span id="editIdLabel" class="fw-bold"></span>. 
@@ -153,342 +217,4 @@
               <div class="col-md-3"><label class="form-label">Tempat, Tgl Lahir</label><input type="text" class="form-control" id="id_ttl"></div>
               <div class="col-md-2"><label class="form-label">Usia</label><input type="number" class="form-control" id="id_usia"></div>
               <div class="col-md-3"><label class="form-label">Tgl Asesmen</label><input type="date" class="form-control" id="id_tglasesmen"></div>
-              <div class="col-md-4"><label class="form-label">Pasal & Perkara</label><input type="text" class="form-control" id="id_pasal"></div>
-              <div class="col-md-3"><label class="form-label">Lama Pidana</label><input type="text" class="form-control" id="id_lamapidana"></div>
-            </div>
-            
-            <h5 class="section-title">Modul 0: Skrinning Administratif</h5>
-            <div class="row g-2">
-              <div class="col-md-3"><label class="form-label">0.1 Usia 20-40</label><select class="form-select" id="m0_1"><option>Ya</option><option>Tidak</option></select></div>
-              <div class="col-md-3"><label class="form-label">0.2 Bkn Pidana Mati</label><select class="form-select" id="m0_2"><option>Ya</option><option>Tidak</option></select></div>
-              <div class="col-md-3"><label class="form-label">0.3 Bkn Bandar</label><select class="form-select" id="m0_3"><option>Ya</option><option>Tidak</option></select></div>
-              <div class="col-md-3"><label class="form-label">0.4 Bkn Pengecualian</label><select class="form-select" id="m0_4"><option>Ya</option><option>Tidak</option></select></div>
-              <div class="col-md-3"><label class="form-label">0.5 Bkn Perlindungan Ank</label><select class="form-select" id="m0_5"><option>Bukan</option><option>Termasuk</option></select></div>
-              <div class="col-md-3"><label class="form-label">0.6 Register F</label><select class="form-select" id="m0_6"><option>Tidak</option><option>Pernah Ringan</option><option>Pernah Lainnya</option></select></div>
-              <div class="col-md-3"><label class="form-label">0.7 Sisa Pidana</label><select class="form-select" id="m0_7"><option>Jarak >= 6 bln</option><option>Jarak < 6 bln</option></select></div>
-              <div class="col-md-3"><label class="form-label">0.8 Tdk Ada Kasus Lain</label><select class="form-select" id="m0_8"><option>Ya</option><option>Tidak</option></select></div>
-              <div class="col-md-3"><label class="form-label">0.9 Bersedia</label><select class="form-select" id="m0_9"><option>Bersedia</option><option>Tidak</option></select></div>
-              <div class="col-md-3"><label class="form-label">Hasil Modul 0</label><select class="form-select bg-warning fw-bold" id="m0_hasil"><option>Lanjut</option><option>Berhenti</option><option>Ditunda</option></select></div>
-            </div>
-          </div>
-
-          <!-- FORM MODUL 1 -->
-          <div class="tab-pane fade" id="f_tab1">
-            <h5 class="section-title">1.1 Data Dokumen</h5>
-            <div class="row g-2">
-              <div class="col-md-3"><label class="form-label">Pasal Didakwa</label><input type="text" class="form-control" id="m1_pasal"></div>
-              <div class="col-md-2"><label class="form-label">Berat BB</label><input type="text" class="form-control" id="m1_bb"></div>
-              <div class="col-md-2"><label class="form-label">Peran</label><input type="text" class="form-control" id="m1_peran"></div>
-              <div class="col-md-3"><label class="form-label">TAT BNN/ASSIST</label><input type="text" class="form-control" id="m1_tat"></div>
-              <div class="col-md-2"><label class="form-label">Tes Urin</label><input type="text" class="form-control" id="m1_urin"></div>
-            </div>
-            <h5 class="section-title">1.2 Wawancara</h5>
-            <div class="row g-2">
-              <div class="col-md-2"><label class="form-label">Zat Utama</label><input type="text" class="form-control" id="m1_zat"></div>
-              <div class="col-md-2"><label class="form-label">Usia Pertama</label><input type="text" class="form-control" id="m1_usia"></div>
-              <div class="col-md-2"><label class="form-label">Lama Rutin</label><input type="text" class="form-control" id="m1_lama"></div>
-              <div class="col-md-2"><label class="form-label">Frekuensi</label><input type="text" class="form-control" id="m1_frek"></div>
-              <div class="col-md-2"><label class="form-label">Cara Pakai</label><input type="text" class="form-control" id="m1_cara"></div>
-              <div class="col-md-2"><label class="form-label">Pakai Terakhir</label><input type="date" class="form-control" id="m1_terakhir"></div>
-              <div class="col-md-6"><label class="form-label">Pernah Rehab</label><input type="text" class="form-control" id="m1_rehab"></div>
-              <div class="col-md-6"><label class="form-label">Coba Berhenti</label><input type="text" class="form-control" id="m1_berhenti"></div>
-            </div>
-            <h5 class="section-title">1.3 Daftar 11 Gejala</h5>
-            <div id="m1_gejala_container" class="row"></div>
-            <div class="mt-2 fw-bold">Skor Gejala: <span id="skorM1" class="text-primary fs-5">0</span>/11</div><input type="hidden" id="val_skorM1" value="0">
-            <h5 class="section-title">1.4 - 1.6 Kesimpulan Modul 1</h5>
-            <div class="row g-2">
-              <div class="col-md-4"><label class="form-label">Triangulasi</label><select class="form-select" id="m1_triangulasi"><option>Konsisten</option><option>Sebagian</option><option>Tidak Konsisten</option></select></div>
-              <div class="col-md-4"><label class="form-label">Red Flag</label><select class="form-select" id="m1_redflag"><option>Tidak Ada</option><option>Ada Pendukung</option><option>Ada Kuat</option></select></div>
-              <div class="col-md-4"><label class="form-label">Kategori M1</label><select class="form-select border-primary" id="m1_kategori"><option>Kategori 1 (Terverifikasi)</option><option>Kategori 2 (Sedang)</option><option>Kategori 3 (Bukan Pengguna)</option><option>Kategori 4 (Pengedar)</option></select></div>
-            </div>
-          </div>
-
-          <!-- FORM MODUL 2 & 3 -->
-          <div class="tab-pane fade" id="f_tab2">
-            <h5 class="section-title">Modul 2: Fisik & Medis</h5>
-            <div class="row g-2 mb-3">
-              <div class="col-md-2"><label class="form-label">Tensi</label><input type="text" class="form-control" id="m2_td"></div>
-              <div class="col-md-2"><label class="form-label">Nadi</label><input type="text" class="form-control" id="m2_nadi"></div>
-              <div class="col-md-2"><label class="form-label">Suhu</label><input type="text" class="form-control" id="m2_suhu"></div>
-              <div class="col-md-2"><label class="form-label">BB(kg)</label><input type="text" class="form-control" id="m2_bb"></div>
-              <div class="col-md-2"><label class="form-label">TB(cm)</label><input type="text" class="form-control" id="m2_tb"></div>
-              <div class="col-md-12"><label class="form-label">Kesimpulan M2</label>
-                <select class="form-select border-primary fw-bold" id="m2_kesimpulan" onchange="calcTotal()">
-                  <option value="9">LAYAK (9 Poin)</option>
-                  <option value="5">LAYAK BERSYARAT (5 Poin)</option>
-                  <option value="0">TUNDA (0 Poin)</option>
-                </select>
-              </div>
-            </div>
-            <h5 class="section-title">Modul 3: Risiko & Stabilitas</h5>
-            <div class="row g-2">
-              <div class="col-md-2"><label class="form-label">3.1 RRI</label><select class="form-select m3-val" id="m3_1" onchange="calcTotal()"><option value="7">Rendah (7)</option><option value="5">Sedang (5)</option><option value="3">Tinggi (3)</option><option value="0">Sgt Tinggi (0)</option></select></div>
-              <div class="col-md-2"><label class="form-label">3.2 Screening</label><select class="form-select m3-val" id="m3_2" onchange="calcTotal()"><option value="6">Minimum (6)</option><option value="3">Medium (3)</option><option value="0">Maksimum (0)</option></select></div>
-              <div class="col-md-2"><label class="form-label">3.3 Rwyt Kabur</label><select class="form-select" id="m3_3"><option>Tidak pernah</option><option>Pernah</option></select></div>
-              <div class="col-md-3"><label class="form-label">3.4 Kekerasan</label><select class="form-select m3-val" id="m3_4" onchange="calcTotal()"><option value="4">Tidak ada (4)</option><option value="0">Ada (0)</option></select></div>
-              <div class="col-md-3"><label class="form-label">3.5 Pembinaan</label><select class="form-select m3-val" id="m3_5" onchange="calcTotal()"><option value="3">Tanpa teguran (3)</option><option value="1">Teguran lisan (1)</option></select></div>
-            </div>
-            <div class="mt-2 fw-bold">Skor M3: <span id="skorM3_view" class="text-danger fs-5">20</span>/20</div><input type="hidden" id="val_skorM3" value="20">
-          </div>
-
-          <!-- FORM MODUL 4 -->
-          <div class="tab-pane fade" id="f_tab4">
-            <h5 class="section-title">4A. Minat & Bakat</h5>
-            <table class="table table-bordered table-sm table-radio mt-2" id="tabel4a"></table>
-            <div class="row g-2">
-              <div class="col-md-4"><label class="form-label">4A.2 Pengalaman(0-5)</label><input type="number" class="form-control" id="m4a_pengalaman" value="0" onchange="calcTotal()"></div>
-              <div class="col-md-4"><label class="form-label">4A.3 Kesediaan(0-2)</label><input type="number" class="form-control" id="m4a_kesediaan" value="0" onchange="calcTotal()"></div>
-            </div>
-            <div class="fw-bold mt-2">Skor M4A: <span id="skorM4A_view" class="text-success fs-5">0</span>/13</div><input type="hidden" id="val_skorM4A" value="0">
-            <h5 class="section-title">4B. Motivasi & Kesiapan Berubah</h5>
-            <table class="table table-bordered table-sm table-radio mt-2" id="tabel4b"></table>
-            <div class="fw-bold mt-2">Konversi M4B: <span id="skorM4B_view" class="text-success fs-5">0</span>/25</div><input type="hidden" id="val_skorM4B_mentah" value="0"><input type="hidden" id="val_skorM4B_konv" value="0">
-            <h5 class="section-title">4C (Sikap) & 4D (Fisik)</h5>
-            <div class="row g-2">
-              <div class="col-md-2"><label class="form-label">4C.1 Dspln(1-5)</label><input type="number" class="form-control m4c-val" id="m4c_1" value="3" onchange="calcTotal()"></div>
-              <div class="col-md-2"><label class="form-label">4C.2 T.Jwb(1-5)</label><input type="number" class="form-control m4c-val" id="m4c_2" value="3" onchange="calcTotal()"></div>
-              <div class="col-md-2"><label class="form-label">4C.3 KrjSm(1-5)</label><input type="number" class="form-control m4c-val" id="m4c_3" value="3" onchange="calcTotal()"></div>
-              <div class="col-md-2"><label class="form-label">4C.4 Emosi(1-5)</label><input type="number" class="form-control m4c-val" id="m4c_4" value="3" onchange="calcTotal()"></div>
-              <div class="col-md-2"><label class="form-label">4C.5 Patuh(1-5)</label><input type="number" class="form-control m4c-val" id="m4c_5" value="3" onchange="calcTotal()"></div>
-              <div class="col-md-2"><label class="form-label">Skor 4C</label><input type="text" class="form-control fw-bold" id="val_skorM4C" readonly></div>
-            </div>
-            <div class="row g-2 mt-2">
-              <div class="col-md-2"><label class="form-label">4D.1 Fisik(0-2)</label><input type="number" class="form-control m4d-val" id="m4d_1" value="2" onchange="calcTotal()"></div>
-              <div class="col-md-2"><label class="form-label">4D.2 Rwyt(0-2)</label><input type="number" class="form-control m4d-val" id="m4d_2" value="2" onchange="calcTotal()"></div>
-              <div class="col-md-2"><label class="form-label">4D.3 Prktk(0-2)</label><input type="number" class="form-control m4d-val" id="m4d_3" value="2" onchange="calcTotal()"></div>
-              <div class="col-md-2"><label class="form-label">Skor 4D</label><input type="text" class="form-control fw-bold" id="val_skorM4D" readonly></div>
-            </div>
-          </div>
-
-          <!-- FORM REKAP -->
-          <div class="tab-pane fade" id="f_tab5">
-            <h5 class="section-title bg-success">B.5 Rekap Skor & Keputusan</h5>
-            <table class="table table-bordered fs-4 mt-3">
-              <tr class="table-light"><th>GRAND TOTAL SKOR</th><th class="text-center text-danger" id="gt_view">0</th></tr>
-              <tr><th>Kategori Rekomendasi</th><th class="text-center text-primary fw-bold" id="kat_view">TIDAK LAYAK</th></tr>
-            </table>
-            <input type="hidden" id="val_gt" value="0"><input type="hidden" id="val_kat" value="-">
-
-            <div class="row g-3">
-              <div class="col-md-6"><label class="form-label">Rekomendasi Klaster</label><select class="form-select border-primary" id="val_klaster"><option>Pertanian (Kementan)</option><option>Perikanan (KKP)</option><option>Re-Edukasi Non-Lahan</option></select></div>
-              <div class="col-md-6"><label class="form-label">Sidang TPP UPT</label><select class="form-select border-primary" id="val_tpp"><option>Disetujui</option><option>Tidak Disetujui</option><option>Ditunda</option></select></div>
-            </div>
-            
-            <hr class="mt-5">
-            <button type="button" class="btn btn-primary btn-lg w-100 shadow" id="btnSimpan" onclick="submitData()">💾 SIMPAN DATA</button>
-          </div>
-
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
-<script>
-  // PENTING: URL Web App Anda
-  const API_URL = "https://script.google.com/macros/s/AKfycbzo3IGnkOBHLLDtP_FD4rnnXC81rq6S0OuC_vI0FQ-mQXa0TLwLIRqC-1Ix86NbgGtN/exec"; 
-
-  let asr = "";
-  let globalDataMap = {}; 
-  let activeEditId = null; 
-
-  const list_m1 = ["1. Pakai > rencana", "2. Gagal berhenti", "3. Waktu tersita", "4. Craving", "5. Gagal kewajiban", "6. Mslh sosial", "7. Mningglkn hobi", "8. Situasi bhya", "9. Mslh fisik/mental", "10. Toleransi dosis", "11. Gejala putus zat"];
-  const list_m4a = ["A1 Padi", "A2 Sayur", "A3 Alat Tani", "B1 Tambak", "B2 Kapal", "B3 Olah Ikan", "C1 Mekanik", "C2 Pertukangan", "C3 Alat", "D1 Memasak", "D2 Gudang", "D3 Menjahit", "E1 Adm", "E2 Laundry/Jasa", "E3 Komputer"];
-  const list_m4b = ["1. Ingin berhenti.", "2. Sadar rugi.", "3. Sedia tes urin.", "4. Tdk perlu ubah(R).", "5. Mau kerja keras.", "6. Mau belajar.", "7. Sedia ikut aturan.", "8. Ikut agar bebas(R).", "9. Punya rencana.", "10. Tau hindari.", "11. Yakin bersih.", "12. Keluarga dukung."];
-
-  window.onload = function() {
-    let htmlM1 = ""; list_m1.forEach((q, i) => htmlM1 += `<div class="col-md-6"><div class="form-check"><input class="form-check-input m1-cek" type="checkbox" id="m1_g${i+1}" value="Ya" onchange="calcTotal()"><label class="form-check-label">${q}</label></div></div>`); document.getElementById('m1_gejala_container').innerHTML = htmlM1;
-    let html4a = `<tr class="table-light"><th>Pernyataan (0,1,2)</th><th style="width:80px;">Pilihan</th></tr>`; list_m4a.forEach((q, i) => html4a += `<tr><td>${q}</td><td><select class="form-select form-select-sm m4a-val" id="m4a_${i+1}" onchange="calcTotal()"><option value="0">0</option><option value="1">1</option><option value="2">2</option></select></td></tr>`); document.getElementById('tabel4a').innerHTML = html4a;
-    let html4b = `<tr class="table-light"><th>Pernyataan (1-4)</th><th style="width:80px;">Pilihan</th></tr>`; list_m4b.forEach((q, i) => html4b += `<tr><td>${q}</td><td><select class="form-select form-select-sm m4b-val" id="m4b_${i+1}" onchange="calcTotal()"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option></select></td></tr>`); document.getElementById('tabel4b').innerHTML = html4b;
-    calcTotal();
-  };
-
-  // ----- LOGIC AUTH & READ -----
-  function doLogin() {
-    let btn = document.querySelector('#formLogin button'); btn.innerText = "Memeriksa..."; btn.disabled = true;
-    fetch(API_URL, { method: 'POST', redirect: 'follow', headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "login", username: document.getElementById('username').value, password: document.getElementById('password').value }) })
-    .then(r => r.text()).then(text => {
-      try {
-        let r = JSON.parse(text);
-        if(r.success) { asr = r.user.nama; document.getElementById('loginSection').style.display = 'none'; document.getElementById('appSection').style.display = 'block'; document.getElementById('userInfo').innerText = asr; loadDataList(); }
-        else { alert(r.message); btn.innerText = "Masuk"; btn.disabled = false; }
-      } catch(e) { alert("Error API. Cek konfigurasi Deployment Google Apps Script."); btn.innerText = "Masuk"; btn.disabled = false; }
-    }).catch(e => { alert("Error: " + e); btn.innerText = "Masuk"; btn.disabled = false; });
-  }
-
-  function loadDataList() {
-    let tbody = document.getElementById('dataTableBody'); tbody.innerHTML = `<tr><td colspan="8" class="text-center">Mengambil data dari Server...</td></tr>`;
-    fetch(API_URL, { method: 'POST', redirect: 'follow', headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "read" }) })
-    .then(r => r.json()).then(r => {
-      if(r.success && r.data.length > 0) {
-        tbody.innerHTML = ""; globalDataMap = {};
-        r.data.forEach(row => {
-          let id = row[0]; globalDataMap[id] = row;
-          let tr = `<tr>
-            <td><small class="text-muted">${id}</small></td>
-            <td>${row[1]}</td><td>${row[3]}</td><td class="fw-bold">${row[2]}</td>
-            <td>${row[4]}</td><td><span class="badge bg-secondary">${row[101]}</span></td>
-            <td><span class="badge ${row[102]==='LAYAK'?'bg-primary':row[102].includes('BERSYARAT')?'bg-warning text-dark':'bg-danger'}">${row[102]}</span></td>
-            <td>
-              <button class="btn btn-sm btn-success" onclick="cetakData('${id}')">🖨️ PDF</button>
-              <button class="btn btn-sm btn-primary" onclick="editData('${id}')">✏️ Edit</button>
-              <button class="btn btn-sm btn-danger" onclick="deleteData('${id}')">🗑️ Hapus</button>
-            </td>
-          </tr>`;
-          tbody.innerHTML += tr;
-        });
-      } else { tbody.innerHTML = `<tr><td colspan="8" class="text-center">Belum ada data.</td></tr>`; }
-    });
-  }
-
-  // ----- LOGIC CETAK (PDF) -----
-  function cetakData(id) {
-    let d = globalDataMap[id];
-    if (!d) return alert("Data tidak valid.");
-
-    // Memasukkan data ke template HTML tersembunyi
-    document.getElementById('pdf_nama').innerText = d[2];
-    document.getElementById('pdf_noreg').innerText = d[3];
-    document.getElementById('pdf_upt').innerText = d[4];
-    document.getElementById('pdf_ttl').innerText = d[5];
-    document.getElementById('pdf_usia').innerText = d[6];
-    document.getElementById('pdf_tgl_asesmen').innerText = d[7];
-    document.getElementById('pdf_pasal').innerText = d[8];
-    document.getElementById('pdf_lama_pidana').innerText = d[9];
-    
-    document.getElementById('pdf_skor_m1').innerText = d[43];
-    document.getElementById('pdf_kesimpulan_m1').innerText = d[46];
-    document.getElementById('pdf_skor_m2').innerText = d[52];
-    document.getElementById('pdf_skor_m3').innerText = d[58];
-    document.getElementById('pdf_skor_m4a').innerText = d[76];
-    document.getElementById('pdf_skor_m4b').innerText = d[90];
-    document.getElementById('pdf_skor_m4c').innerText = d[96];
-    document.getElementById('pdf_skor_m4d').innerText = d[100];
-    
-    document.getElementById('pdf_skor_total').innerText = d[101];
-    document.getElementById('pdf_kategori_hasil').innerText = d[102];
-    document.getElementById('pdf_rekomendasi_klaster').innerText = d[103];
-    document.getElementById('pdf_keputusan_tpp').innerText = d[104];
-    document.getElementById('pdf_asesor').innerText = d[1];
-    document.getElementById('pdf_ttd_asesor').innerText = d[1];
-
-    // Konfigurasi & Render html2pdf
-    var element = document.getElementById('pdfContent');
-    var opt = {
-      margin:       15,
-      filename:     'Asesmen_IKPR_' + d[2] + '.pdf',
-      image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2 },
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
-    
-    // Proses pembuatan PDF
-    html2pdf().set(opt).from(element).save();
-  }
-
-  // ----- LOGIC UPDATE & DELETE -----
-  function deleteData(id) {
-    if(!confirm("Yakin ingin menghapus data asesmen dengan ID: " + id + " ?")) return;
-    fetch(API_URL, { method: 'POST', redirect: 'follow', headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "delete", id: id }) })
-    .then(r => r.json()).then(r => { alert(r.message); loadDataList(); });
-  }
-
-  function editData(id) {
-    let d = globalDataMap[id];
-    if(!d) return alert("Data tidak valid di memory.");
-    activeEditId = id; 
-    document.getElementById('editAlert').classList.remove('d-none');
-    document.getElementById('editIdLabel').innerText = id;
-    
-    document.querySelector('[data-bs-target="#tabForm"]').click();
-    document.querySelector('[data-bs-target="#f_tab0"]').click();
-    
-    let textFields = ['id_nama','id_noreg','id_upt','id_ttl','id_usia','id_tglasesmen','id_pasal','id_lamapidana',
-      'm0_1','m0_2','m0_3','m0_4','m0_5','m0_6','m0_7','m0_8','m0_9','m0_hasil',
-      'm1_pasal','m1_bb','m1_peran','m1_tat','m1_urin',
-      'm1_zat','m1_usia','m1_lama','m1_frek','m1_cara','m1_terakhir','m1_rehab','m1_berhenti'];
-    textFields.forEach((tid, i) => document.getElementById(tid).value = d[i+2] || "");
-    
-    for(let i=1; i<=11; i++) document.getElementById('m1_g'+i).checked = (d[i+31] === "Ya");
-    ['val_skorM1','m1_triangulasi','m1_redflag','m1_kategori','m2_td','m2_nadi','m2_suhu','m2_bb','m2_tb','m2_kesimpulan','m3_1','m3_2','m3_3','m3_4','m3_5','val_skorM3'].forEach((tid, i) => document.getElementById(tid).value = d[i+43] || "");
-    for(let i=1; i<=15; i++) document.getElementById('m4a_'+i).value = d[i+58] || "0";
-    ['m4a_pengalaman','m4a_kesediaan','val_skorM4A'].forEach((tid, i) => document.getElementById(tid).value = d[i+74] || "");
-    for(let i=1; i<=12; i++) document.getElementById('m4b_'+i).value = d[i+76] || "3";
-    ['val_skorM4B_mentah','val_skorM4B_konv'].forEach((tid, i) => document.getElementById(tid).value = d[i+89] || "");
-    for(let i=1; i<=5; i++) document.getElementById('m4c_'+i).value = d[i+91] || "3";
-    document.getElementById('val_skorM4C').value = d[96] || "";
-    for(let i=1; i<=3; i++) document.getElementById('m4d_'+i).value = d[i+96] || "2";
-    
-    ['val_skorM4D','val_gt','val_kat','val_klaster','val_tpp'].forEach((tid, i) => document.getElementById(tid).value = d[i+100] || "");
-    
-    calcTotal(); 
-    
-    let btn = document.getElementById('btnSimpan');
-    btn.innerText = "🔄 UPDATE DATA ASESMEN";
-    btn.classList.replace("btn-primary", "btn-warning");
-  }
-
-  function resetFormForNew() {
-    activeEditId = null;
-    document.getElementById('editAlert').classList.add('d-none');
-    document.getElementById('formAsesmen').reset();
-    let btn = document.getElementById('btnSimpan');
-    btn.innerText = "💾 SIMPAN DATA BARU";
-    btn.classList.replace("btn-warning", "btn-primary");
-    calcTotal();
-  }
-
-  function calcTotal() {
-    let sk1 = document.querySelectorAll('.m1-cek:checked').length; document.getElementById('skorM1').innerText = sk1; document.getElementById('val_skorM1').value = sk1;
-    let sk3 = 0; document.querySelectorAll('.m3-val').forEach(e => sk3 += parseInt(e.value)||0); document.getElementById('skorM3_view').innerText = sk3; document.getElementById('val_skorM3').value = sk3;
-    let sk4a_arr = Array.from(document.querySelectorAll('.m4a-val')).map(e => parseInt(e.value)||0);
-    let sk4a_total = Math.max(...sk4a_arr) + (parseInt(document.getElementById('m4a_pengalaman').value)||0) + (parseInt(document.getElementById('m4a_kesediaan').value)||0);
-    document.getElementById('skorM4A_view').innerText = sk4a_total; document.getElementById('val_skorM4A').value = sk4a_total;
-    let sk4b_mth = 0; document.querySelectorAll('.m4b-val').forEach((e, i) => { let v = parseInt(e.value)||0; if(i===3||i===7) v = 5-v; sk4b_mth += v; });
-    let sk4b_k = (sk4b_mth>=39)?25:(sk4b_mth>=33)?20:(sk4b_mth>=27)?15:(sk4b_mth>=21)?10:5;
-    document.getElementById('skorM4B_view').innerText = sk4b_k; document.getElementById('val_skorM4B_mentah').value = sk4b_mth; document.getElementById('val_skorM4B_konv').value = sk4b_k;
-    let sk4c = 0; document.querySelectorAll('.m4c-val').forEach(e => sk4c += parseInt(e.value)||0); document.getElementById('val_skorM4C').value = sk4c;
-    let sk4d = 0; document.querySelectorAll('.m4d-val').forEach(e => sk4d += parseInt(e.value)||0); document.getElementById('val_skorM4D').value = sk4d;
-    let m2 = parseInt(document.getElementById('m2_kesimpulan').value)||0;
-    let grand = sk3 + sk4a_total + sk4b_k + sk4c + sk4d + m2; document.getElementById('gt_view').innerText = grand; document.getElementById('val_gt').value = grand;
-    let kat = (m2===0)?"DITUNDA":(grand>=70)?"LAYAK":(grand>=55)?"LAYAK BERSYARAT":"TIDAK LAYAK"; document.getElementById('kat_view').innerText = kat; document.getElementById('val_kat').value = kat;
-  }
-
-  function submitData() {
-    let btn = document.getElementById('btnSimpan'); btn.disabled = true; btn.innerText = "Menyimpan ke Server...";
-    
-    let arr = [ asr, document.getElementById('id_nama').value, document.getElementById('id_noreg').value, document.getElementById('id_upt').value, document.getElementById('id_ttl').value, document.getElementById('id_usia').value, document.getElementById('id_tglasesmen').value, document.getElementById('id_pasal').value, document.getElementById('id_lamapidana').value,
-      document.getElementById('m0_1').value, document.getElementById('m0_2').value, document.getElementById('m0_3').value, document.getElementById('m0_4').value, document.getElementById('m0_5').value, document.getElementById('m0_6').value, document.getElementById('m0_7').value, document.getElementById('m0_8').value, document.getElementById('m0_9').value, document.getElementById('m0_hasil').value,
-      document.getElementById('m1_pasal').value, document.getElementById('m1_bb').value, document.getElementById('m1_peran').value, document.getElementById('m1_tat').value, document.getElementById('m1_urin').value, document.getElementById('m1_zat').value, document.getElementById('m1_usia').value, document.getElementById('m1_lama').value, document.getElementById('m1_frek').value, document.getElementById('m1_cara').value, document.getElementById('m1_terakhir').value, document.getElementById('m1_rehab').value, document.getElementById('m1_berhenti').value
-    ];
-    for(let i=1; i<=11; i++) arr.push(document.getElementById('m1_g'+i).checked ? "Ya" : "Tidak");
-    ['val_skorM1','m1_triangulasi','m1_redflag','m1_kategori','m2_td','m2_nadi','m2_suhu','m2_bb','m2_tb','m2_kesimpulan','m3_1','m3_2','m3_3','m3_4','m3_5','val_skorM3'].forEach(id => arr.push(document.getElementById(id).value));
-    for(let i=1; i<=15; i++) arr.push(document.getElementById('m4a_'+i).value);
-    ['m4a_pengalaman','m4a_kesediaan','val_skorM4A'].forEach(id => arr.push(document.getElementById(id).value));
-    for(let i=1; i<=12; i++) arr.push(document.getElementById('m4b_'+i).value);
-    ['val_skorM4B_mentah','val_skorM4B_konv'].forEach(id => arr.push(document.getElementById(id).value));
-    for(let i=1; i<=5; i++) arr.push(document.getElementById('m4c_'+i).value);
-    arr.push(document.getElementById('val_skorM4C').value);
-    for(let i=1; i<=3; i++) arr.push(document.getElementById('m4d_'+i).value);
-    ['val_skorM4D','val_gt','val_kat','val_klaster','val_tpp'].forEach(id => arr.push(document.getElementById(id).value));
-
-    let payloadConfig = activeEditId 
-        ? { action: "update", id: activeEditId, payload: arr } 
-        : { action: "save", payload: arr };
-
-    fetch(API_URL, { method: 'POST', redirect: 'follow', headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payloadConfig) })
-    .then(r => r.json()).then(r => {
-      alert(r.message); 
-      btn.disabled = false; 
-      resetFormForNew(); 
-      document.querySelector('[data-bs-target="#tabDashboard"]').click(); 
-      loadDataList(); 
-    }).catch(err => {
-      alert("Error: " + err);
-      btn.disabled = false; btn.innerText = activeEditId ? "🔄 UPDATE DATA ASESMEN" : "💾 SIMPAN DATA BARU";
-    });
-  }
-</script>
-</body>
-</html>
+              <div class="col-md-4"><label
