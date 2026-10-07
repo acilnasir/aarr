@@ -9,18 +9,26 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
-    body { background-color: #f4f6f9; }
-    .kpi-card { border-radius: 10px; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); color: white; }
-    .kpi-card h3 { font-size: 2.5rem; font-weight: 700; margin: 0; }
-    .kpi-card p { font-size: 1.1rem; margin: 0; opacity: 0.9; }
-    .chart-container { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    body { background-color: #f4f6f9; overflow-x: hidden; }
+    .kpi-card { border-radius: 8px; border: none; box-shadow: 0 2px 4px rgba(0,0,0,0.1); color: white; padding: 15px; }
+    .kpi-card h3 { font-size: 2rem; font-weight: 700; margin: 0; line-height: 1.2; }
+    .kpi-card p { font-size: 0.9rem; margin: 0; opacity: 0.9; text-transform: uppercase; font-weight: 600; }
+    .chart-container { background: white; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .chart-title { font-size: 0.95rem; font-weight: bold; color: #495057; text-align: center; margin-bottom: 10px; }
+    
+    /* Pengunci tinggi grafik agar tidak melebar/scroll */
+    .chart-wrapper {
+      position: relative;
+      height: 250px; 
+      width: 100%;
+    }
   </style>
 </head>
 <body>
 
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 shadow">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-3 shadow-sm py-2">
   <div class="container-fluid px-4">
-    <a class="navbar-brand fw-bold" href="#">📊 Eksekutif Dashboard IKP-R</a>
+    <a class="navbar-brand fw-bold fs-5" href="#">📊 Eksekutif Dashboard IKP-R</a>
     <button class="btn btn-outline-light btn-sm" onclick="fetchData()">🔄 Segarkan Data</button>
   </div>
 </nav>
@@ -32,61 +40,73 @@
   </div>
 
   <div id="dashboardContent" style="display: none;">
-    <div class="row g-3 mb-4">
+    
+    <!-- KPI Cards Row -->
+    <div class="row g-3 mb-3">
       <div class="col-md-3">
-        <div class="card kpi-card bg-primary p-3">
+        <div class="card kpi-card bg-primary">
           <p>Total Asesmen</p>
           <h3 id="kpiTotal">0</h3>
         </div>
       </div>
       <div class="col-md-3">
-        <div class="card kpi-card bg-success p-3">
+        <div class="card kpi-card bg-success">
           <p>Total LAYAK</p>
           <h3 id="kpiLayak">0</h3>
         </div>
       </div>
       <div class="col-md-3">
-        <div class="card kpi-card bg-warning text-dark p-3">
+        <div class="card kpi-card bg-warning text-dark">
           <p>LAYAK BERSYARAT</p>
           <h3 id="kpiSyarat">0</h3>
         </div>
       </div>
       <div class="col-md-3">
-        <div class="card kpi-card bg-danger p-3">
+        <div class="card kpi-card bg-danger">
           <p>TIDAK LAYAK</p>
           <h3 id="kpiTidakLayak">0</h3>
         </div>
       </div>
     </div>
 
-    <div class="row g-4 mb-4">
-      <div class="col-md-6">
+    <!-- Charts Row (Dijadikan 1 baris, 3 kolom agar fit satu layar) -->
+    <div class="row g-3">
+      <!-- Grafik 1 -->
+      <div class="col-lg-4 col-md-12">
         <div class="chart-container">
-          <h5 class="text-center mb-3 fw-bold text-secondary">Kategori Kelayakan Asesmen</h5>
-          <canvas id="chartKategori" height="250"></canvas>
+          <div class="chart-title">Kategori Kelayakan Asesmen</div>
+          <div class="chart-wrapper">
+            <canvas id="chartKategori"></canvas>
+          </div>
         </div>
       </div>
-      <div class="col-md-6">
+      
+      <!-- Grafik 2 -->
+      <div class="col-lg-4 col-md-12">
         <div class="chart-container">
-          <h5 class="text-center mb-3 fw-bold text-secondary">Rekomendasi Klaster Pekerjaan</h5>
-          <canvas id="chartKlaster" height="250"></canvas>
+          <div class="chart-title">Rekomendasi Klaster Pekerjaan</div>
+          <div class="chart-wrapper">
+            <canvas id="chartKlaster"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Grafik 3 -->
+      <div class="col-lg-4 col-md-12">
+        <div class="chart-container">
+          <div class="chart-title">Status Sidang TPP UPT</div>
+          <div class="chart-wrapper">
+            <canvas id="chartTPP"></canvas>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="row g-4">
-      <div class="col-md-12">
-        <div class="chart-container">
-          <h5 class="text-center mb-3 fw-bold text-secondary">Status Keputusan Sidang TPP UPT</h5>
-          <canvas id="chartTPP" height="100"></canvas>
-        </div>
-      </div>
-    </div>
   </div>
 </div>
 
 <script>
-  // PENTING: Gunakan URL Web App yang sama
+  // URL API Google Apps Script Anda
   const API_URL = "https://script.google.com/macros/s/AKfycbzo3IGnkOBHLLDtP_FD4rnnXC81rq6S0OuC_vI0FQ-mQXa0TLwLIRqC-1Ix86NbgGtN/exec"; 
 
   let chartKategoriInstance = null;
@@ -120,33 +140,42 @@
     let klsTani = 0, klsIkan = 0, klsNonLahan = 0, klsKosong = 0;
     let tppSetuju = 0, tppTolak = 0, tppTunda = 0;
 
+    // Agregasi Data
     data.forEach(row => {
-      // PERBAIKAN INDEKS: Kolom CZ (Kategori Hasil) = 103
       let kategori = String(row[103] || "").toUpperCase().trim();
       if(kategori === "LAYAK") katLayak++;
       else if(kategori.includes("BERSYARAT")) katSyarat++;
       else if(kategori === "TIDAK LAYAK") katTidak++;
       else katTunda++;
 
-      // PERBAIKAN INDEKS: Kolom DA (Rekomendasi Klaster) = 104
       let klaster = String(row[104] || "").toUpperCase().trim();
       if(klaster.includes("PERTANIAN")) klsTani++;
       else if(klaster.includes("PERIKANAN")) klsIkan++;
       else if(klaster.includes("NON-LAHAN") || klaster.includes("NON LAHAN")) klsNonLahan++;
       else klsKosong++;
 
-      // PERBAIKAN INDEKS: Kolom DB (Keputusan TPP UPT) = 105
       let tpp = String(row[105] || "").toUpperCase().trim();
       if(tpp === "DISETUJUI") tppSetuju++;
       else if(tpp === "TIDAK DISETUJUI") tppTolak++;
       else tppTunda++;
     });
 
+    // Update Angka KPI
     document.getElementById('kpiTotal').innerText = total;
     document.getElementById('kpiLayak').innerText = katLayak;
     document.getElementById('kpiSyarat').innerText = katSyarat;
     document.getElementById('kpiTidakLayak').innerText = katTidak;
 
+    // Default Chart Options untuk konsistensi font dan responsivitas
+    const commonOptions = {
+      responsive: true,
+      maintainAspectRatio: false, // Penting agar mengikuti height container CSS
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } }
+      }
+    };
+
+    // 1. Chart Kategori
     if(chartKategoriInstance) chartKategoriInstance.destroy();
     chartKategoriInstance = new Chart(document.getElementById('chartKategori').getContext('2d'), {
       type: 'doughnut',
@@ -154,40 +183,52 @@
         labels: ['Layak', 'Layak Bersyarat', 'Tidak Layak', 'Ditunda'],
         datasets: [{
           data: [katLayak, katSyarat, katTidak, katTunda],
-          backgroundColor: ['#198754', '#ffc107', '#dc3545', '#6c757d']
+          backgroundColor: ['#198754', '#ffc107', '#dc3545', '#6c757d'],
+          borderWidth: 1
         }]
       },
-      options: { responsive: true, maintainAspectRatio: false }
+      options: commonOptions
     });
 
+    // 2. Chart Klaster
     if(chartKlasterInstance) chartKlasterInstance.destroy();
     chartKlasterInstance = new Chart(document.getElementById('chartKlaster').getContext('2d'), {
       type: 'bar',
       data: {
-        labels: ['Pertanian (Kementan)', 'Perikanan (KKP)', 'Re-Edukasi Non-Lahan'],
+        labels: ['Pertanian', 'Perikanan', 'Non-Lahan'],
         datasets: [{
           label: 'Jumlah Narapidana',
           data: [klsTani, klsIkan, klsNonLahan],
           backgroundColor: ['#20c997', '#0dcaf0', '#fd7e14']
         }]
       },
-      options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+      options: { 
+        ...commonOptions, 
+        plugins: { legend: { display: false } }, // Sembunyikan legend untuk bar chart
+        scales: { y: { beginAtZero: true, ticks: { stepSize: 1, font: {size: 10} }, grid: {drawBorder: false} }, x: { ticks: {font: {size: 10}} } }
+      }
     });
 
+    // 3. Chart TPP
     if(chartTPPInstance) chartTPPInstance.destroy();
     chartTPPInstance = new Chart(document.getElementById('chartTPP').getContext('2d'), {
       type: 'bar',
       data: {
-        labels: ['Disetujui', 'Tidak Disetujui', 'Ditunda'],
+        labels: ['Disetujui', 'Tdk Setuju', 'Ditunda'],
         datasets: [{
-          label: 'Hasil Sidang TPP',
+          label: 'Keputusan TPP',
           data: [tppSetuju, tppTolak, tppTunda],
           backgroundColor: ['#0d6efd', '#dc3545', '#adb5bd']
         }]
       },
-      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+      options: { 
+        ...commonOptions,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { stepSize: 1, font: {size: 10} } }, x: { ticks: {font: {size: 10}} } }
+      }
     });
 
+    // Selesai memuat
     document.getElementById('loadingIndicator').style.display = 'none';
     document.getElementById('dashboardContent').style.display = 'block';
   }
