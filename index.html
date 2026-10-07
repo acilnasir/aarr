@@ -5,7 +5,6 @@
   <title>Aplikasi Asesmen Narapidana - IKP-R CRUD & Cetak PDF Full</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
   <style>
@@ -45,9 +44,18 @@
     </div>
   </div>
 
+  <!-- BANNER PENGUNCI APLIKASI (Disembunyikan secara default) -->
+  <div id="lockBanner" class="alert alert-danger text-center fw-bold d-none mb-3 shadow-sm">
+    🔒 APLIKASI TERKUNCI: Sesi penginputan dan pengubahan data asesmen telah ditutup.
+  </div>
+
   <ul class="nav nav-tabs" id="mainTabs">
-    <li class="nav-item"><button class="nav-link active fw-bold text-primary" data-bs-toggle="tab" data-bs-target="#tabDashboard" type="button" onclick="loadDataList()">📋 Data Asesmen</button></li>
-    <li class="nav-item"><button class="nav-link fw-bold text-success" data-bs-toggle="tab" data-bs-target="#tabForm" type="button" onclick="resetFormForNew()">➕ Asesmen Baru</button></li>
+    <li class="nav-item">
+      <button class="nav-link active fw-bold text-primary" data-bs-toggle="tab" data-bs-target="#tabDashboard" type="button" onclick="loadDataList()">📋 Data Asesmen</button>
+    </li>
+    <li class="nav-item" id="tabFormContainer">
+      <button class="nav-link fw-bold text-success" id="tabFormBtn" data-bs-toggle="tab" data-bs-target="#tabForm" type="button" onclick="resetFormForNew()">➕ Asesmen Baru</button>
+    </li>
   </ul>
 
   <div class="tab-content bg-white p-4 border border-top-0 shadow-sm">
@@ -230,12 +238,18 @@
 </div>
 
 <script>
-  // PENTING: URL Web App Anda
+  // =========================================================================
+  // SAKLAR KUNCI APLIKASI
+  // Ubah menjadi true untuk MENGUNCI aplikasi. Ubah ke false untuk MEMBUKA.
+  // =========================================================================
+  const KUNCI_APLIKASI = true; 
+  // =========================================================================
+
   const API_URL = "https://script.google.com/macros/s/AKfycbzo3IGnkOBHLLDtP_FD4rnnXC81rq6S0OuC_vI0FQ-mQXa0TLwLIRqC-1Ix86NbgGtN/exec"; 
 
   let asr = "";
   let globalDataMap = {}; 
-  let activeEditNoreg = null; // KUNCI UTAMA SEKARANG MENGGUNAKAN NO. REGISTER
+  let activeEditNoreg = null; 
 
   const list_m1 = ["1. Pakai lebih banyak", "2. Gagal berhenti", "3. Waktu tersita", "4. Craving", "5. Gagal kewajiban", "6. Masalah sosial", "7. Meninggalkan hobi", "8. Situasi bahaya", "9. Masalah fisik", "10. Toleransi dosis", "11. Gejala putus zat"];
   const list_m4a = ["A1 Padi/Sawah", "A2 Sayur/Kebun", "A3 Alat Tani", "B1 Tambak", "B2 Kapal", "B3 Olah Ikan", "C1 Mekanik", "C2 Pertukangan", "C3 Alat", "D1 Memasak", "D2 Gudang", "D3 Menjahit", "E1 Adm/Data", "E2 Laundry/Cukur", "E3 Komputer"];
@@ -254,7 +268,20 @@
     .then(r => r.text()).then(text => {
       try {
         let r = JSON.parse(text);
-        if(r.success) { asr = r.user.nama; document.getElementById('loginSection').style.display = 'none'; document.getElementById('appSection').style.display = 'block'; document.getElementById('userInfo').innerText = asr; loadDataList(); }
+        if(r.success) { 
+          asr = r.user.nama; 
+          document.getElementById('loginSection').style.display = 'none'; 
+          document.getElementById('appSection').style.display = 'block'; 
+          document.getElementById('userInfo').innerText = asr; 
+          
+          // Jika aplikasi dikunci, sembunyikan tab form dan tampilkan banner
+          if(KUNCI_APLIKASI) {
+            document.getElementById('lockBanner').classList.remove('d-none');
+            document.getElementById('tabFormContainer').style.display = 'none';
+          }
+
+          loadDataList(); 
+        }
         else { alert(r.message); btn.innerText = "Masuk"; btn.disabled = false; }
       } catch(e) { alert("Error API. Cek konfigurasi Deployment Google Apps Script."); btn.innerText = "Masuk"; btn.disabled = false; }
     }).catch(e => { alert("Error: " + e); btn.innerText = "Masuk"; btn.disabled = false; });
@@ -268,16 +295,21 @@
         tbody.innerHTML = ""; globalDataMap = {};
         r.data.forEach(row => {
           let id = row[0]; globalDataMap[id] = row;
+          
+          // Render Action Buttons
+          let aksiHtml = `<button class="btn btn-sm btn-success" onclick="cetakData('${id}')">🖨️ PDF Full</button>`;
+          // Sembunyikan tombol Edit & Hapus jika terkunci
+          if(!KUNCI_APLIKASI) {
+            aksiHtml += ` <button class="btn btn-sm btn-primary" onclick="editData('${id}')">✏️ Edit</button>
+                          <button class="btn btn-sm btn-danger" onclick="deleteData('${id}')">🗑️ Hapus</button>`;
+          }
+
           let tr = `<tr>
             <td><small class="text-muted">${id}</small></td>
             <td>${row[1]}</td><td>${row[3]}</td><td class="fw-bold">${row[2]}</td>
-            <td>${row[4]}</td><td><span class="badge bg-secondary">${row[101]}</span></td>
-            <td><span class="badge ${row[102]==='LAYAK'?'bg-primary':row[102].includes('BERSYARAT')?'bg-warning text-dark':'bg-danger'}">${row[102]}</span></td>
-            <td>
-              <button class="btn btn-sm btn-success" onclick="cetakData('${id}')">🖨️ PDF Full</button>
-              <button class="btn btn-sm btn-primary" onclick="editData('${id}')">✏️ Edit</button>
-              <button class="btn btn-sm btn-danger" onclick="deleteData('${id}')">🗑️ Hapus</button>
-            </td>
+            <td>${row[4]}</td><td><span class="badge bg-secondary">${row[102]}</span></td>
+            <td><span class="badge ${row[103]==='LAYAK'?'bg-primary':row[103].includes('BERSYARAT')?'bg-warning text-dark':'bg-danger'}">${row[103]}</span></td>
+            <td>${aksiHtml}</td>
           </tr>`;
           tbody.innerHTML += tr;
         });
@@ -421,19 +453,19 @@
   }
 
   function deleteData(id) {
-    let noreg = globalDataMap[id][3]; // MENGGUNAKAN NO REGISTER
+    if(KUNCI_APLIKASI) return alert("Aksi ditolak: Aplikasi sedang dikunci.");
+    let noreg = globalDataMap[id][3]; 
     if(!confirm("Yakin ingin menghapus data asesmen dengan No. Register: " + noreg + " ?")) return;
     fetch(API_URL, { method: 'POST', redirect: 'follow', headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "delete", id: noreg }) })
     .then(r => r.json()).then(r => { alert(r.message); loadDataList(); });
   }
 
   function editData(id) {
+    if(KUNCI_APLIKASI) return alert("Aksi ditolak: Aplikasi sedang dikunci.");
     let d = globalDataMap[id];
     if(!d) return alert("Data tidak valid di memory.");
     
-    // MENGGUNAKAN NO REGISTER SEBAGAI KUNCI UPDATE
     activeEditNoreg = d[3]; 
-    
     document.getElementById('editAlert').classList.remove('d-none');
     document.getElementById('editIdLabel').innerText = activeEditNoreg;
     
@@ -509,7 +541,6 @@
     for(let i=1; i<=3; i++) arr.push(document.getElementById('m4d_'+i).value);
     ['val_skorM4D','val_gt','val_kat','val_klaster','val_tpp'].forEach(id => arr.push(document.getElementById(id).value));
 
-    // MENGIRIM PAYLOAD DENGAN ID MENGGUNAKAN NO. REGISTER
     let payloadConfig = activeEditNoreg 
         ? { action: "update", id: activeEditNoreg, payload: arr } 
         : { action: "save", payload: arr };
