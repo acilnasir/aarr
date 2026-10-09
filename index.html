@@ -48,6 +48,7 @@
     <h4>Sistem Asesmen IKP-R</h4>
     <div>
       <span id="userInfo" class="badge bg-secondary me-2"></span>
+      <button id="btnToggleLock" class="btn btn-sm me-2 d-none" onclick="toggleKunciAplikasi()"></button>
       <button class="btn btn-sm btn-outline-danger" onclick="location.reload()">Keluar</button>
     </div>
   </div>
@@ -248,14 +249,20 @@
 <script>
   // =========================================================================
   // SAKLAR KUNCI APLIKASI
-  // Ubah menjadi true untuk MENGUNCI aplikasi. Ubah ke false untuk MEMBUKA.
+  // Nilai default saat belum pernah diubah oleh Kepala Bapas (true = terkunci).
+  // Setelah itu status dapat diubah langsung dari tombol di aplikasi oleh
+  // user dengan jabatan "Kepala Bapas", dan disimpan di localStorage browser.
   // =========================================================================
-  const KUNCI_APLIKASI = true; 
+  const DEFAULT_KUNCI_APLIKASI = true;
+  let KUNCI_APLIKASI = (localStorage.getItem('kunciAplikasi') !== null)
+    ? (localStorage.getItem('kunciAplikasi') === 'true')
+    : DEFAULT_KUNCI_APLIKASI;
   // =========================================================================
 
   const API_URL = "https://script.google.com/macros/s/AKfycbzo3IGnkOBHLLDtP_FD4rnnXC81rq6S0OuC_vI0FQ-mQXa0TLwLIRqC-1Ix86NbgGtN/exec"; 
 
   let asr = "";
+  let userJabatan = "";
   let globalDataMap = {}; 
   let activeEditNoreg = null; 
 
@@ -278,21 +285,58 @@
         let r = JSON.parse(text);
         if(r.success) { 
           asr = r.user.nama; 
+          userJabatan = r.user.jabatan || "";
           document.getElementById('loginSection').style.display = 'none'; 
           document.getElementById('appSection').style.display = 'block'; 
           document.getElementById('userInfo').innerText = asr; 
-          
-          // Jika aplikasi dikunci, sembunyikan tab form dan tampilkan banner
-          if(KUNCI_APLIKASI) {
-            document.getElementById('lockBanner').classList.remove('d-none');
-            document.getElementById('tabFormContainer').style.display = 'none';
+
+          // Tombol buka/kunci aplikasi hanya muncul untuk Kepala Bapas
+          if(userJabatan === 'Kepala Bapas') {
+            document.getElementById('btnToggleLock').classList.remove('d-none');
           }
 
+          applyKunciAplikasiUI();
           loadDataList(); 
         }
         else { alert(r.message); btn.innerText = "Masuk"; btn.disabled = false; }
       } catch(e) { alert("Error API. Cek konfigurasi Deployment Google Apps Script."); btn.innerText = "Masuk"; btn.disabled = false; }
     }).catch(e => { alert("Error: " + e); btn.innerText = "Masuk"; btn.disabled = false; });
+  }
+
+  // Menampilkan banner, tab form, dan tombol toggle sesuai status KUNCI_APLIKASI
+  function applyKunciAplikasiUI() {
+    let banner = document.getElementById('lockBanner');
+    let tabForm = document.getElementById('tabFormContainer');
+    let btnToggle = document.getElementById('btnToggleLock');
+
+    if(KUNCI_APLIKASI) {
+      banner.classList.remove('d-none');
+      tabForm.style.display = 'none';
+    } else {
+      banner.classList.add('d-none');
+      tabForm.style.display = '';
+    }
+
+    if(userJabatan === 'Kepala Bapas') {
+      btnToggle.classList.remove('d-none');
+      btnToggle.className = KUNCI_APLIKASI
+        ? 'btn btn-sm btn-success me-2'
+        : 'btn btn-sm btn-warning me-2';
+      btnToggle.innerText = KUNCI_APLIKASI ? '🔓 Buka Aplikasi' : '🔒 Kunci Aplikasi';
+    }
+  }
+
+  // Hanya dapat dipanggil oleh user dengan jabatan Kepala Bapas (tombolnya tersembunyi bagi user lain)
+  function toggleKunciAplikasi() {
+    if(userJabatan !== 'Kepala Bapas') return;
+    let aksi = KUNCI_APLIKASI ? 'MEMBUKA' : 'MENGUNCI';
+    if(!confirm(`Yakin ingin ${aksi} aplikasi ini?`)) return;
+
+    KUNCI_APLIKASI = !KUNCI_APLIKASI;
+    localStorage.setItem('kunciAplikasi', KUNCI_APLIKASI);
+
+    applyKunciAplikasiUI();
+    loadDataList();
   }
 
   function loadDataList() {
