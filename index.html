@@ -139,13 +139,24 @@
         <div class="col-md-2"><select class="form-select form-select-sm d-none" id="fltUpt" onchange="renderDataTable()"><option value="">Semua UPT</option></select></div>
         <div class="col-md-2"><select class="form-select form-select-sm" id="fltKategori" onchange="renderDataTable()"><option value="">Semua Kategori</option><option>LAYAK</option><option>LAYAK BERSYARAT</option><option>TIDAK LAYAK</option><option>DITUNDA</option></select></div>
         <div class="col-md-2"><select class="form-select form-select-sm" id="fltEdit" onchange="renderDataTable()"><option value="">Semua waktu edit</option><option value="1">Diedit 24 jam terakhir</option><option value="7">Diedit 7 hari terakhir</option><option value="30">Diedit 30 hari terakhir</option></select></div>
+        <div class="col-12 d-none" id="batchBar">
+          <div class="border rounded p-2 bg-light d-flex flex-wrap align-items-center gap-2">
+            <b class="small">Generate PDF massal</b>
+            <label class="small mb-0">Tgl asesmen</label>
+            <input type="date" class="form-control form-control-sm w-auto" id="bAwal" onchange="renderDataTable()">
+            <span class="small">s/d</span>
+            <input type="date" class="form-control form-control-sm w-auto" id="bAkhir" onchange="renderDataTable()">
+            <button class="btn btn-sm btn-dark" id="btnBatch" onclick="generateBatchPreview()">📑 Generate PDF Terpilih (0)</button>
+            <small class="text-muted">Pilih rentang tanggal (maks. 1 bulan, maks. 50 data), centang data, lalu generate.</small>
+          </div>
+        </div>
         <div class="col-12 d-flex justify-content-between align-items-center"><small class="text-muted" id="dataCount"></small><div><button class="btn btn-sm btn-outline-primary me-1" onclick="buatLaporan()">📄 Buat Laporan</button><button class="btn btn-sm btn-outline-success me-1 d-none" id="btnExport" onclick="exportAsesmen()">⬇️ Ekspor Semua Data</button><button class="btn btn-sm btn-link" onclick="resetFilter()">Reset filter</button></div></div>
       </div>
       <div class="table-responsive">
         <table class="table table-bordered table-hover align-middle">
           <thead class="table-dark" id="dataTableHead">
             <tr>
-              <th data-sort="waktu"  class="" style="cursor:pointer;white-space:nowrap;" onclick="setSort('waktu')">ID/Waktu Input <span class="sort-ind"></span></th><th data-sort="updated"  class="" style="cursor:pointer;white-space:nowrap;" onclick="setSort('updated')">Terakhir Diedit <span class="sort-ind"></span></th><th data-sort="asesor"  class="" style="cursor:pointer;white-space:nowrap;" onclick="setSort('asesor')">Asesor <span class="sort-ind"></span></th><th data-sort="noreg"  class="" style="cursor:pointer;white-space:nowrap;" onclick="setSort('noreg')">No. Register <span class="sort-ind"></span></th><th data-sort="nama"  class="" style="cursor:pointer;white-space:nowrap;" onclick="setSort('nama')">Nama Narapidana <span class="sort-ind"></span></th><th data-sort="upt"  class="" style="cursor:pointer;white-space:nowrap;" onclick="setSort('upt')">UPT <span class="sort-ind"></span></th>
+              <th id="thPilih" class="d-none"><input type="checkbox" class="form-check-input" id="chkAll" onchange="toggleAllRows(this.checked)" title="Pilih semua yang tampil"></th><th data-sort="waktu"  class="" style="cursor:pointer;white-space:nowrap;" onclick="setSort('waktu')">ID/Waktu Input <span class="sort-ind"></span></th><th data-sort="updated"  class="" style="cursor:pointer;white-space:nowrap;" onclick="setSort('updated')">Terakhir Diedit <span class="sort-ind"></span></th><th data-sort="asesor"  class="" style="cursor:pointer;white-space:nowrap;" onclick="setSort('asesor')">Asesor <span class="sort-ind"></span></th><th data-sort="noreg"  class="" style="cursor:pointer;white-space:nowrap;" onclick="setSort('noreg')">No. Register <span class="sort-ind"></span></th><th data-sort="nama"  class="" style="cursor:pointer;white-space:nowrap;" onclick="setSort('nama')">Nama Narapidana <span class="sort-ind"></span></th><th data-sort="upt"  class="" style="cursor:pointer;white-space:nowrap;" onclick="setSort('upt')">UPT <span class="sort-ind"></span></th>
               <th data-sort="uptAsesor" id="thUptAsesor" class="d-none" style="cursor:pointer;white-space:nowrap;" onclick="setSort('uptAsesor')">UPT Asesor <span class="sort-ind"></span></th><th data-sort="kanwil" id="thKanwilAsesor" class="d-none" style="cursor:pointer;white-space:nowrap;" onclick="setSort('kanwil')">Kanwil <span class="sort-ind"></span></th>
               <th data-sort="skor"  class="" style="cursor:pointer;white-space:nowrap;" onclick="setSort('skor')">Skor <span class="sort-ind"></span></th><th data-sort="kategori"  class="" style="cursor:pointer;white-space:nowrap;" onclick="setSort('kategori')">Kategori Akhir <span class="sort-ind"></span></th><th>Aksi</th>
             </tr>
@@ -786,17 +797,103 @@
     renderDataTable();
   }
 
+  const BATCH_MAX = 50;
+  const selectedIds = new Set();
+  let currentBatch = null;
+
+  function toggleRow(id, on) { on ? selectedIds.add(id) : selectedIds.delete(id); updateBatchUI(); }
+  function toggleAllRows(on) {
+    currentFilteredRows.forEach(r => on ? selectedIds.add(r[0]) : selectedIds.delete(r[0]));
+    renderDataTable();
+  }
+  function updateBatchUI() {
+    const n = currentFilteredRows.filter(r => selectedIds.has(r[0])).length;
+    const btn = document.getElementById('btnBatch');
+    if (btn) btn.textContent = `📑 Generate PDF Terpilih (${n})`;
+    const all = document.getElementById('chkAll');
+    if (all) all.checked = currentFilteredRows.length > 0 && n === currentFilteredRows.length;
+  }
+
+  // Generate massal: wajib rentang tanggal asesmen maks. 1 bulan; hanya data tercentang yang tampil di rentang itu.
+  async function generateBatchPreview() {
+    const awal = document.getElementById('bAwal').value, akhir = document.getElementById('bAkhir').value;
+    if (!awal || !akhir) return alert('Pilih tanggal awal dan tanggal akhir asesmen terlebih dahulu.');
+    if (new Date(akhir) < new Date(awal)) return alert('Tanggal akhir tidak boleh sebelum tanggal awal.');
+    const batasAkhir = new Date(awal); batasAkhir.setMonth(batasAkhir.getMonth() + 1);
+    if (new Date(akhir) > batasAkhir) return alert('Rentang tanggal maksimal 1 bulan.');
+    const rows = currentFilteredRows.filter(r => selectedIds.has(r[0]));
+    if (!rows.length) return alert('Centang minimal satu data pada rentang tanggal tersebut.');
+    if (rows.length > BATCH_MAX) return alert(`Maksimal ${BATCH_MAX} data per sekali generate. Saat ini terpilih ${rows.length}.`);
+
+    const btn = document.getElementById('btnBatch');
+    btn.disabled = true;
+    try {
+      const items = new Array(rows.length);
+      let done = 0;
+      const kerja = async () => {
+        while (done < rows.length) {
+          const i = done++;
+          const d = rows[i];
+          let r = null;
+          try { r = await callApi('getPengesahan', { id: d[3] }); } catch (e) {}
+          items[i] = `<div class="batch-item">${buildAsesmenHtml(d, buildPengesahanHtml(r && r.success ? r : null, d))}</div>`;
+          btn.textContent = `Menyiapkan ${items.filter(Boolean).length}/${rows.length}...`;
+        }
+      };
+      await Promise.all([kerja(), kerja(), kerja(), kerja()]);
+      currentBatch = rows;
+      currentPdfFilename = `Asesmen_IKPR_${awal}_sd_${akhir}_${rows.length}data.pdf`;
+      currentPdfOrientation = 'portrait';
+      document.getElementById('pdfPreviewTitle').innerText = `Pratinjau ${rows.length} Asesmen IKP-R (${awal} s/d ${akhir})`;
+      document.getElementById('pdfPaper').innerHTML = items.join('<div class="html2pdf__page-break"></div>');
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('pdfPreviewModal')).show();
+    } finally {
+      btn.disabled = false; updateBatchUI();
+    }
+  }
+
+  // Satu PDF gabungan; tiap data dirender satu per satu agar kanvas tidak melebihi batas browser.
+  async function downloadBatchPdf() {
+    const btn = document.getElementById('btnDownloadPdf');
+    const items = Array.from(document.querySelectorAll('#pdfPaper .batch-item'));
+    const base = { margin: 10, image: { type: 'jpeg', quality: 0.85 },
+      html2canvas: { scale: 1.5, useCORS: true, scrollX: 0, scrollY: 0, backgroundColor: '#ffffff' },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }, pagebreak: { mode: ['css', 'legacy'], avoid: 'tr' } };
+    btn.disabled = true;
+    try {
+      let pdf = null;
+      for (let i = 0; i < items.length; i++) {
+        btn.innerText = `Membuat PDF ${i + 1}/${items.length}...`;
+        const w = html2pdf().set(base).from(items[i]);
+        if (pdf) { w.prop.pdf = pdf; pdf.addPage(); }
+        await w.toPdf();
+        pdf = w.prop.pdf;
+      }
+      pdf.save(currentPdfFilename);
+    } catch (err) {
+      alert('Gagal membuat PDF: ' + err);
+    } finally {
+      btn.disabled = false; btn.innerText = '⬇️ Download PDF';
+    }
+  }
+
   function renderDataTable() {
     const q = document.getElementById('fltSearch').value.trim().toLowerCase();
     const fa = document.getElementById('fltAsesor').value, fu = document.getElementById('fltUpt').value;
     const fk = document.getElementById('fltKategori').value, fe = document.getElementById('fltEdit').value;
     const cutoff = fe ? Date.now() - parseInt(fe) * 86400000 : 0;
+    const canBatch = userTingkat === 'UPT' && isPimpinanUI();
+    const bAwal = canBatch ? document.getElementById('bAwal').value : '', bAkhir = canBatch ? document.getElementById('bAkhir').value : '';
+    document.getElementById('batchBar').classList.toggle('d-none', !canBatch);
+    document.getElementById('thPilih').classList.toggle('d-none', !canBatch);
 
     let rows = allRows.filter(r => {
       if (fa && r[1] !== fa) return false;
       if (fu && r[4] !== fu) return false;
       if (fk && r[103] !== fk) return false;
       if (cutoff && !(new Date(r[110]).getTime() >= cutoff)) return false;
+      if (bAwal && String(r[7] || '') < bAwal) return false;
+      if (bAkhir && String(r[7] || '') > bAkhir) return false;
       if (q && ![r[1], r[2], r[3], r[4], r[106], r[107], r[0]].join(' ').toLowerCase().includes(q)) return false;
       return true;
     });
@@ -811,7 +908,7 @@
     document.getElementById('dataCount').textContent = `${rows.length} dari ${allRows.length} data`;
 
     let tbody = document.getElementById('dataTableBody');
-    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="10" class="text-center">${allRows.length ? 'Tidak ada data yang cocok.' : 'Belum ada data.'}</td></tr>`; return; }
+    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="11" class="text-center">${allRows.length ? 'Tidak ada data yang cocok.' : 'Belum ada data.'}</td></tr>`; return; }
     const recent = Date.now() - 86400000;
     tbody.innerHTML = rows.map(row => {
       const id = row[0];
@@ -822,7 +919,8 @@
       }
       const kolomUptKanwil = userTingkat === 'UPT' ? '' : `<td>${escHtml(row[106] || '-')}</td><td>${escHtml(row[107] || '-')}</td>`;
       const diedit = row[110] && row[110] !== row[0] && new Date(row[110]).getTime() > recent ? ' <span class="badge bg-info text-dark">baru</span>' : '';
-      return `<tr>
+      const pilih = canBatch ? `<td><input type="checkbox" class="form-check-input" ${selectedIds.has(id) ? 'checked' : ''} onchange="toggleRow('${id}', this.checked)"></td>` : '';
+      return `<tr>${pilih}
         <td><small class="text-muted">${escHtml(id)}</small></td>
         <td><small>${fmtWaktu(row[110])}</small>${diedit}</td>
         <td>${escHtml(row[1])}</td><td>${escHtml(row[3])}</td><td class="fw-bold">${escHtml(row[2])}</td>
@@ -831,11 +929,10 @@
         <td>${aksiHtml}</td>
       </tr>`;
     }).join('');
+    updateBatchUI();
   }
 
-  function cetakData(id) {
-    let d = globalDataMap[id];
-    if (!d) return alert("Data tidak valid.");
+  function buildAsesmenHtml(d, pengesahanHtml) {
     const m4c_labels = ["1. Disiplin & Waktu", "2. Tanggung Jawab", "3. Kerja Sama", "4. Kendali Emosi", "5. Kepatuhan"];
     const m4d_labels = ["1. Uji Tahan Fisik (0-2)", "2. Riwayat Kerja (0-2)", "3. Praktik (0-2)"];
 
@@ -947,9 +1044,17 @@
       
       <p style="margin-top: 15px; font-size:10px;"><b>Pernyataan asesor:</b> Saya melaksanakan asesmen ini sesuai pedoman, tidak menerima imbalan dalam bentuk apa pun, dan tidak memiliki hubungan kepentingan dengan warga binaan yang dinilai.</p>
       
-      <div id="pengesahanSlot"></div>
+      ${pengesahanHtml}
     </div>
     `;
+    return html;
+  }
+
+  function cetakData(id) {
+    let d = globalDataMap[id];
+    if (!d) return alert("Data tidak valid.");
+    const html = buildAsesmenHtml(d, '<div id="pengesahanSlot"></div>');
+    currentBatch = null;
 
     currentPdfFilename = 'Asesmen_IKPR_' + d[3] + '_' + d[2] + '.pdf';
     currentPdfOrientation = 'portrait';
@@ -978,7 +1083,7 @@
     return `<table width="100%" style="margin-top:30px; font-size:11px; page-break-inside:avoid;"><tr>
       ${col('Wali Pemasyarakatan', r && r.wali, '')}
       ${col('Tenaga Kesehatan', r && r.nakes, '')}
-      ${col('Asesor', r && r.asesor, d[0])}
+      ${col('Asesor', r && r.asesor, d[1])}
     </tr></table>`;
   }
 
@@ -1080,6 +1185,7 @@
   let currentPdfOrientation = 'portrait';
 
   function downloadPreviewPdf() {
+    if (currentBatch) return downloadBatchPdf();
     const btn = document.getElementById('btnDownloadPdf');
     btn.disabled = true; btn.innerText = "Membuat PDF...";
     const body = document.getElementById('pdfPreviewBody');
