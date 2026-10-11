@@ -1,4 +1,4 @@
-project_id = "GANTI_DENGAN_PROJECT_REF_ANDA"
+project_id = "nicvhbztcjdmralzgqqm"
 
 [functions.api]
 # Nonaktifkan verifikasi JWT supaya endpoint bisa dipanggil langsung dari

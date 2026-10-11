@@ -7,3 +7,4 @@ supabase/import/data/
 
 # Supabase CLI local state
 .supabase/
+supabase/.temp/

@@ -9,7 +9,9 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { compare } from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
+// compareSync (bukan compare async) dipakai karena versi async memakai Worker,
+// yang tidak tersedia di runtime Supabase Edge Functions.
+import { compareSync } from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -93,7 +95,7 @@ async function checkLogin(username: string, password: string) {
     return { success: false, message: "Username/password salah!" };
   }
 
-  const valid = await compare(password, data.password_hash);
+  const valid = compareSync(password, data.password_hash);
   if (!valid) {
     return { success: false, message: "Username/password salah!" };
   }
