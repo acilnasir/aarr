@@ -5,6 +5,7 @@
   <title>Aplikasi Asesmen Narapidana - IKP-R CRUD & Cetak PDF Full</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
   <style>
@@ -79,6 +80,9 @@
     <li class="nav-item">
       <button class="nav-link active fw-bold text-primary" data-bs-toggle="tab" data-bs-target="#tabDashboard" type="button" onclick="loadDataList()">📋 Data Asesmen</button>
     </li>
+    <li class="nav-item d-none" id="tabEksekutifContainer">
+      <button class="nav-link fw-bold text-info" data-bs-toggle="tab" data-bs-target="#tabEksekutif" type="button" onclick="loadEksekutif()">📊 Dashboard Eksekutif</button>
+    </li>
     <li class="nav-item" id="tabFormContainer">
       <button class="nav-link fw-bold text-success" id="tabFormBtn" data-bs-toggle="tab" data-bs-target="#tabForm" type="button" onclick="resetFormForNew()">➕ Asesmen Baru</button>
     </li>
@@ -98,6 +102,28 @@
 
   <div class="tab-content bg-white p-4 border border-top-0 shadow-sm">
     
+    <!-- DASHBOARD EKSEKUTIF -->
+    <div class="tab-pane fade" id="tabEksekutif">
+      <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+        <h5 class="m-0">Dashboard Eksekutif <small class="text-muted" id="eksScopeLabel"></small></h5>
+        <div class="d-flex gap-2">
+          <select class="form-select form-select-sm d-none" id="eksKanwil" onchange="onEksKanwilChange()"><option value="">Semua Kanwil</option></select>
+          <select class="form-select form-select-sm d-none" id="eksUpt" onchange="loadEksekutif()"><option value="">Semua UPT</option></select>
+          <button class="btn btn-sm btn-info text-white" onclick="loadEksekutif()">🔄 Refresh</button>
+        </div>
+      </div>
+      <div class="row g-3 mb-3" id="eksKpi"></div>
+      <div class="row g-3">
+        <div class="col-md-4"><div class="card h-100"><div class="card-header fw-bold">Kategori Rekomendasi</div><div class="card-body"><canvas id="chKategori"></canvas></div></div></div>
+        <div class="col-md-4"><div class="card h-100"><div class="card-header fw-bold">Rekomendasi Klaster</div><div class="card-body"><canvas id="chKlaster"></canvas></div></div></div>
+        <div class="col-md-4"><div class="card h-100"><div class="card-header fw-bold">Keputusan Sidang TPP</div><div class="card-body"><canvas id="chTpp"></canvas></div></div></div>
+        <div class="col-md-6"><div class="card h-100"><div class="card-header fw-bold">Tren Asesmen per Bulan</div><div class="card-body"><canvas id="chBulanan"></canvas></div></div></div>
+        <div class="col-md-3"><div class="card h-100"><div class="card-header fw-bold">Kelompok Usia</div><div class="card-body"><canvas id="chUsia"></canvas></div></div></div>
+        <div class="col-md-3"><div class="card h-100"><div class="card-header fw-bold">Zat yang Disalahgunakan</div><div class="card-body"><canvas id="chZat"></canvas></div></div></div>
+      </div>
+      <div class="mt-4" id="eksTabelWrap"></div>
+    </div>
+
     <!-- DASHBOARD -->
     <div class="tab-pane fade show active" id="tabDashboard">
       <div class="d-flex justify-content-between align-items-center mb-3">
@@ -387,15 +413,12 @@
 
 <script>
   // =========================================================================
-  // SAKLAR KUNCI APLIKASI
-  // Nilai default saat belum pernah diubah oleh Kepala Bapas (true = terkunci).
-  // Setelah itu status dapat diubah langsung dari tombol di aplikasi oleh
-  // user dengan jabatan "Kepala Bapas", dan disimpan di localStorage browser.
+  // KUNCI APLIKASI: status disimpan di server (tabel kunci_aplikasi) dan
+  // diterapkan di backend. Kepala Bapas mengunci UPT-nya, Kanwil seluruh UPT di
+  // provinsinya, Ditjen seluruh UPT nasional.
   // =========================================================================
-  const DEFAULT_KUNCI_APLIKASI = true;
-  let KUNCI_APLIKASI = (localStorage.getItem('kunciAplikasi') !== null)
-    ? (localStorage.getItem('kunciAplikasi') === 'true')
-    : DEFAULT_KUNCI_APLIKASI;
+  let KUNCI_APLIKASI = false;
+  let kunciInfo = { locked: false, locked_by: null, can_toggle: false, scope: 'UPT' };
   // =========================================================================
 
   // Backend: Supabase Edge Function (menggantikan Google Apps Script).
@@ -433,7 +456,12 @@
     document.getElementById('thUptAsesor').classList.toggle('d-none', userTingkat === 'UPT');
     document.getElementById('thKanwilAsesor').classList.toggle('d-none', userTingkat === 'UPT');
 
-    if (userTingkat === 'UPT') return;
+    const kepala = userJabatan.trim().toLowerCase() === 'kepala bapas';
+    if (userTingkat !== 'UPT' || kepala) document.getElementById('tabEksekutifContainer').classList.remove('d-none');
+    if (userTingkat === 'UPT') {
+      if (kepala) document.getElementById('tabUserContainer').classList.remove('d-none');
+      return;
+    }
 
     // Kanwil & Ditjen hanya memantau: tab "Asesmen Baru" (input) disembunyikan.
     document.getElementById('tabFormContainer').style.display = 'none';
@@ -478,13 +506,8 @@
           document.getElementById('appSection').style.display = 'block'; 
           document.getElementById('userInfo').innerText = asr; 
 
-          // Tombol buka/kunci aplikasi hanya muncul untuk Kepala Bapas
-          if(userJabatan === 'Kepala Bapas') {
-            document.getElementById('btnToggleLock').classList.remove('d-none');
-          }
-
-          applyKunciAplikasiUI();
           applyStrukturOrganisasiUI();
+          loadKunci();
           loadPenandatangan();
           loadDataList(); 
         }
@@ -493,40 +516,124 @@
     }).catch(e => { alert("Error: " + e); btn.innerText = "Masuk"; btn.disabled = false; });
   }
 
-  // Menampilkan banner, tab form, dan tombol toggle sesuai status KUNCI_APLIKASI
+  function loadKunci() {
+    return callApi('getKunci').then(r => {
+      if (r.success) { kunciInfo = r; KUNCI_APLIKASI = !!r.locked; }
+      applyKunciAplikasiUI();
+    });
+  }
+
+  // Menampilkan banner, tab form, dan tombol toggle sesuai status kunci dari server
   function applyKunciAplikasiUI() {
     let banner = document.getElementById('lockBanner');
     let tabForm = document.getElementById('tabFormContainer');
     let btnToggle = document.getElementById('btnToggleLock');
+    const asal = { DITJEN: 'Direktorat Jenderal', KANWIL: 'Kantor Wilayah', UPT: 'Kepala Bapas' }[kunciInfo.locked_by];
 
-    if(KUNCI_APLIKASI) {
+    if (KUNCI_APLIKASI) {
       banner.classList.remove('d-none');
-      tabForm.style.display = 'none';
+      banner.innerText = '🔒 APLIKASI TERKUNCI' + (asal ? ' oleh ' + asal : '') + ': Sesi penginputan dan pengubahan data asesmen telah ditutup.';
     } else {
       banner.classList.add('d-none');
-      tabForm.style.display = '';
     }
+    if (userTingkat === 'UPT') tabForm.style.display = KUNCI_APLIKASI ? 'none' : '';
 
-    if(userJabatan === 'Kepala Bapas') {
+    if (kunciInfo.can_toggle) {
       btnToggle.classList.remove('d-none');
       btnToggle.className = KUNCI_APLIKASI
         ? 'btn btn-sm btn-success me-2'
         : 'btn btn-sm btn-warning me-2';
       btnToggle.innerText = KUNCI_APLIKASI ? '🔓 Buka Aplikasi' : '🔒 Kunci Aplikasi';
+    } else {
+      btnToggle.classList.add('d-none');
     }
   }
 
-  // Hanya dapat dipanggil oleh user dengan jabatan Kepala Bapas (tombolnya tersembunyi bagi user lain)
   function toggleKunciAplikasi() {
-    if(userJabatan !== 'Kepala Bapas') return;
+    if (!kunciInfo.can_toggle) return;
     let aksi = KUNCI_APLIKASI ? 'MEMBUKA' : 'MENGUNCI';
     if(!confirm(`Yakin ingin ${aksi} aplikasi ini?`)) return;
+    callApi('setKunci', { locked: !KUNCI_APLIKASI }).then(r => {
+      if (!r.success) alert(r.message);
+      loadKunci().then(loadDataList);
+    });
+  }
 
-    KUNCI_APLIKASI = !KUNCI_APLIKASI;
-    localStorage.setItem('kunciAplikasi', KUNCI_APLIKASI);
+  // =========================================================================
+  // DASHBOARD EKSEKUTIF
+  // =========================================================================
+  let eksCharts = {};
+  let eksOptions = null;
+  const eksWarna = ['#0d6efd', '#198754', '#ffc107', '#dc3545', '#6f42c1', '#20c997', '#fd7e14', '#6c757d'];
+  const eksKategoriWarna = { 'LAYAK': '#0d6efd', 'LAYAK BERSYARAT': '#ffc107', 'TIDAK LAYAK': '#dc3545', 'DITUNDA': '#6c757d' };
 
-    applyKunciAplikasiUI();
-    loadDataList();
+  function eksChart(id, type, labels, data, colors, opts) {
+    if (eksCharts[id]) eksCharts[id].destroy();
+    const axis = type === 'bar' || type === 'line';
+    eksCharts[id] = new Chart(document.getElementById(id), {
+      type: type,
+      data: { labels: labels, datasets: [{ data: data, backgroundColor: colors || eksWarna, borderColor: type === 'line' ? '#0d6efd' : undefined, label: 'Jumlah' }] },
+      options: Object.assign({ plugins: { legend: { display: !axis } }, scales: axis ? { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { beginAtZero: true, ticks: { precision: 0 } } } : {} }, opts || {})
+    });
+  }
+
+  function onEksKanwilChange() {
+    document.getElementById('eksUpt').value = '';
+    renderEksUptOptions();
+    loadEksekutif();
+  }
+
+  function renderEksUptOptions() {
+    if (!eksOptions) return;
+    const k = document.getElementById('eksKanwil').value;
+    const sel = document.getElementById('eksUpt'), cur = sel.value;
+    const list = eksOptions.upt.filter(u => !k || u.kanwil_id === k);
+    sel.innerHTML = '<option value="">Semua UPT</option>' + list.map(u => `<option value="${u.id}">${esc(u.nama)}</option>`).join('');
+    sel.value = list.some(u => u.id === cur) ? cur : '';
+  }
+
+  function loadEksekutif() {
+    const extra = {};
+    const k = document.getElementById('eksKanwil').value, u = document.getElementById('eksUpt').value;
+    if (k) extra.kanwil_id = k;
+    if (u) extra.upt_id = u;
+    callApi('getStatistik', extra).then(r => {
+      if (!r.success) return alert(r.message);
+      if (!eksOptions) {
+        eksOptions = r.options;
+        const ks = document.getElementById('eksKanwil');
+        ks.innerHTML = '<option value="">Semua Kanwil</option>' + r.options.kanwil.map(x => `<option value="${x.id}">${esc(x.nama)}</option>`).join('');
+        ks.classList.toggle('d-none', userTingkat !== 'DITJEN');
+        renderEksUptOptions();
+        document.getElementById('eksUpt').classList.toggle('d-none', userTingkat === 'UPT');
+      }
+      document.getElementById('eksScopeLabel').innerText = { DITJEN: '— Nasional', KANWIL: '— Provinsi', UPT: '— Unit Pelaksana Teknis' }[r.tingkat];
+
+      const kat = r.kategori || {};
+      const pct = r.total ? Math.round(((kat['LAYAK'] || 0) + (kat['LAYAK BERSYARAT'] || 0)) / r.total * 1000) / 10 : 0;
+      const kpi = (judul, nilai, kls) => `<div class="col-6 col-md"><div class="card text-center border-${kls}"><div class="card-body py-3"><div class="text-muted small">${judul}</div><div class="fs-3 fw-bold text-${kls}">${nilai}</div></div></div></div>`;
+      document.getElementById('eksKpi').innerHTML =
+        kpi('Total Asesmen', r.total, 'primary') + kpi('Rata-rata Skor', r.rata_skor, 'success') +
+        kpi('Layak + Bersyarat', pct + '%', 'info') + kpi('Jumlah UPT', r.jumlah_upt, 'secondary') +
+        kpi('Diedit 7 Hari', r.diedit_7hari, 'warning');
+
+      const ent = o => Object.entries(o || {}).sort((a, b) => b[1] - a[1]);
+      const k1 = ent(kat); eksChart('chKategori', 'doughnut', k1.map(x => x[0]), k1.map(x => x[1]), k1.map(x => eksKategoriWarna[x[0]] || '#adb5bd'));
+      const k2 = ent(r.klaster); eksChart('chKlaster', 'pie', k2.map(x => x[0]), k2.map(x => x[1]));
+      const k3 = ent(r.tpp); eksChart('chTpp', 'pie', k3.map(x => x[0]), k3.map(x => x[1]));
+      eksChart('chBulanan', 'line', r.bulanan.map(x => x.bulan), r.bulanan.map(x => x.n), ['#0d6efd'], { elements: { line: { tension: 0.3 } } });
+      const u1 = Object.entries(r.usia || {}).filter(x => x[1] > 0); eksChart('chUsia', 'bar', u1.map(x => x[0]), u1.map(x => x[1]), ['#20c997']);
+      const z = ent(r.zat).slice(0, 8); eksChart('chZat', 'bar', z.map(x => x[0]), z.map(x => x[1]), ['#6f42c1'], { indexAxis: 'y' });
+
+      const tabel = (judul, rows) => `<h6 class="mt-3">${judul}</h6><div class="table-responsive"><table class="table table-sm table-bordered table-hover align-middle">
+        <thead class="table-dark"><tr><th>Nama</th><th class="text-end">Total</th><th class="text-end">Layak</th><th class="text-end">Bersyarat</th><th class="text-end">Tidak Layak</th><th class="text-end">Ditunda</th><th class="text-end">Rata Skor</th><th class="text-end">% Layak</th></tr></thead>
+        <tbody>${rows.map(x => `<tr><td>${esc(x.nama)}</td><td class="text-end fw-bold">${x.total}</td><td class="text-end">${x.layak}</td><td class="text-end">${x.bersyarat}</td><td class="text-end">${x.tidak}</td><td class="text-end">${x.ditunda}</td><td class="text-end">${x.rata_skor}</td><td class="text-end">${x.total ? Math.round(x.layak / x.total * 100) : 0}%</td></tr>`).join('') || '<tr><td colspan="8" class="text-center">Belum ada data.</td></tr>'}</tbody></table></div>`;
+      let html = '';
+      if (r.per_kanwil) html += tabel('Perbandingan antar Kanwil', r.per_kanwil);
+      if (r.per_upt && r.tingkat !== 'UPT') html += tabel('Perbandingan antar UPT', r.per_upt);
+      if (r.per_asesor) html += tabel('Kinerja per Asesor', r.per_asesor);
+      document.getElementById('eksTabelWrap').innerHTML = html;
+    });
   }
 
   let allRows = [];
@@ -1094,7 +1201,7 @@
   function loadUserList() {
     let tbody = document.getElementById('userTableBody');
     tbody.innerHTML = `<tr><td colspan="6" class="text-center">Memuat data...</td></tr>`;
-    Promise.all([callApi("listUsers"), callApi("listUpt"), userTingkat === 'DITJEN' ? callApi("listKanwil") : Promise.resolve({ success: true, data: kanwilCache })])
+    Promise.all([callApi("listUsers"), userTingkat === 'UPT' ? Promise.resolve({ success: false }) : callApi("listUpt"), userTingkat === 'DITJEN' ? callApi("listKanwil") : Promise.resolve({ success: true, data: kanwilCache })])
     .then(([userRes, uptRes, kanwilRes]) => {
       if (uptRes.success) uptCache = uptRes.data || [];
       if (kanwilRes.success) kanwilCache = kanwilRes.data || [];
@@ -1117,6 +1224,7 @@
   }
 
   function renderUnitFieldByTingkat(tingkat, uptId, kanwilId) {
+    if (userTingkat === 'UPT') return `<input type="hidden" id="am_upt_id" value="${esc(userUptId)}">`;
     if (tingkat === 'KANWIL') {
       return `<label class="form-label">Kanwil</label><select id="am_kanwil_id" class="form-select mb-2" ${userTingkat === 'KANWIL' ? 'disabled' : ''}>${kanwilSelectOptions(kanwilId || userKanwilId)}</select>`;
     }
@@ -1133,7 +1241,7 @@
     callApi("listUsers").then(r => {
       let u = username && r.success ? (r.data || []).find(x => x.username === username) : null;
       let tingkatAwal = (u && u.tingkat) || 'UPT';
-      let tingkatOptions = ['UPT', 'KANWIL'].concat(userTingkat === 'DITJEN' ? ['DITJEN'] : []);
+      let tingkatOptions = userTingkat === 'UPT' ? ['UPT'] : ['UPT', 'KANWIL'].concat(userTingkat === 'DITJEN' ? ['DITJEN'] : []);
       document.getElementById('adminModalBody').innerHTML = `
         <label class="form-label">Username</label>
         <input type="text" id="am_username" class="form-control mb-2" value="${esc(username)}" ${username ? 'disabled' : ''}>
