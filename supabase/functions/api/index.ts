@@ -144,6 +144,11 @@ serve(async (req: Request) => {
       case "read":
         result = await readDataAsesmen(session);
         break;
+      case "exportAsesmen":
+        result = isPimpinan(session)
+          ? await readDataAsesmen(session)
+          : forbidden("Hanya pimpinan yang dapat mengekspor data.");
+        break;
       case "update":
         result = await updateDataAsesmen(session, body.id, body.payload, body.wali, body.nakes);
         break;
@@ -163,6 +168,17 @@ serve(async (req: Request) => {
         break;
       case "getPengesahan":
         result = await getPengesahan(session, body.id);
+        break;
+
+      // --- Kunci aplikasi & dashboard eksekutif ---
+      case "getKunci":
+        result = await getKunci(session);
+        break;
+      case "setKunci":
+        result = await setKunci(session, !!body.locked);
+        break;
+      case "getStatistik":
+        result = await getStatistik(session, body.kanwil_id, body.upt_id);
         break;
 
       // --- Akun sendiri ---
@@ -342,6 +358,7 @@ async function saveDataAsesmen(session: SessionPayload, payload: unknown[], wali
   if (session.tingkat !== "UPT") {
     return forbidden("Hanya user tingkat UPT yang dapat menginput data asesmen.");
   }
+  if ((await lockStatus(session)).locked) return forbidden("Aplikasi sedang dikunci.");
   const id = nowJakartaTimestamp();
   const noRegister = extractNoRegister(payload);
 
@@ -384,7 +401,7 @@ async function readDataAsesmen(session: SessionPayload) {
 
   let query = supabase
     .from("hasil_asesmen")
-    .select("id, payload, upt_id, wali_username, nakes_username, upt:upt_id(nama, kanwil:kanwil_id(nama))")
+    .select("id, payload, upt_id, wali_username, nakes_username, updated_at, upt:upt_id(nama, kanwil:kanwil_id(nama))")
     .order("created_at", { ascending: false });
   if (uptIds !== null) {
     query = query.in("upt_id", uptIds);
@@ -406,6 +423,7 @@ async function readDataAsesmen(session: SessionPayload) {
     row.upt?.kanwil?.nama ?? "",
     row.wali_username ?? "",
     row.nakes_username ?? "",
+    row.updated_at ?? "",
   ]);
   return { success: true, data: records };
 }
@@ -414,6 +432,7 @@ async function updateDataAsesmen(session: SessionPayload, idNoreg: string, paylo
   if (session.tingkat !== "UPT") {
     return forbidden("Hanya user tingkat UPT yang dapat mengubah data asesmen.");
   }
+  if ((await lockStatus(session)).locked) return forbidden("Aplikasi sedang dikunci.");
   const target = String(idNoreg).trim();
   const newNoRegister = extractNoRegister(payload);
 
@@ -445,6 +464,7 @@ async function deleteDataAsesmen(session: SessionPayload, idNoreg: string) {
   if (session.tingkat !== "UPT") {
     return forbidden("Hanya user tingkat UPT yang dapat menghapus data asesmen.");
   }
+  if ((await lockStatus(session)).locked) return forbidden("Aplikasi sedang dikunci.");
   const target = String(idNoreg).trim();
 
   const { data: existing, error: findError } = await supabase
@@ -571,6 +591,213 @@ async function getPengesahan(session: SessionPayload, idNoreg: string) {
     wali: await fetchUser(rec.wali_username),
     nakes: await fetchUser(rec.nakes_username),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Kunci aplikasi (tutup/buka input asesmen)
+//   Kepala Bapas -> mengunci UPT-nya; Kanwil -> seluruh UPT di provinsinya;
+//   Ditjen -> seluruh UPT nasional. Kunci terkuat dari atas yang berlaku.
+// ---------------------------------------------------------------------------
+// Pimpinan tertinggi per tingkat: Kepala Bapas (UPT), Kepala Kanwil, Dirjen/admin Ditjen.
+function isPimpinan(session: SessionPayload): boolean {
+  const peran = (session.peran ?? "").trim().toLowerCase();
+  if (session.tingkat === "UPT") return peran === "kepala bapas";
+  if (session.tingkat === "KANWIL") return peran.includes("kepala");
+  return /direktur|dirjen|admin/.test(peran);
+}
+
+function isKepalaBapas(session: SessionPayload): boolean {
+  return session.tingkat === "UPT" && (session.peran ?? "").trim().toLowerCase() === "kepala bapas";
+}
+
+// Daftar lingkup yang berlaku bagi pemanggil, dari tertinggi ke terendah.
+async function lockScopes(session: SessionPayload): Promise<{ scope: Tingkat; ref: string }[]> {
+  const scopes: { scope: Tingkat; ref: string }[] = [{ scope: "DITJEN", ref: "" }];
+  if (session.tingkat === "KANWIL" && session.kanwil_id) {
+    scopes.push({ scope: "KANWIL", ref: session.kanwil_id });
+  } else if (session.tingkat === "UPT" && session.upt_id) {
+    const { data } = await supabase.from("upt").select("kanwil_id").eq("id", session.upt_id).maybeSingle();
+    if (data?.kanwil_id) scopes.push({ scope: "KANWIL", ref: data.kanwil_id });
+    scopes.push({ scope: "UPT", ref: session.upt_id });
+  }
+  return scopes;
+}
+
+async function lockStatus(session: SessionPayload) {
+  const scopes = await lockScopes(session);
+  const { data } = await supabase.from("kunci_aplikasi").select("scope, ref_id, locked").eq("locked", true);
+  const active = new Set((data ?? []).map((r) => `${r.scope}:${r.ref_id}`));
+  const hit = scopes.find((s) => active.has(`${s.scope}:${s.ref}`));
+  const own = scopes[scopes.length - 1];
+  return {
+    locked: !!hit,
+    locked_by: hit?.scope ?? null,
+    own_locked: active.has(`${own.scope}:${own.ref}`),
+    own_scope: own,
+  };
+}
+
+async function getKunci(session: SessionPayload) {
+  const st = await lockStatus(session);
+  const canToggle = (session.tingkat !== "UPT" || isKepalaBapas(session)) &&
+    (st.locked_by === null || st.locked_by === st.own_scope.scope);
+  return {
+    success: true,
+    locked: st.locked,
+    locked_by: st.locked_by,
+    own_locked: st.own_locked,
+    can_toggle: canToggle,
+    scope: st.own_scope.scope,
+  };
+}
+
+async function setKunci(session: SessionPayload, locked: boolean) {
+  if (session.tingkat === "UPT" && !isKepalaBapas(session)) {
+    return forbidden("Hanya Kepala Bapas yang dapat mengunci/membuka aplikasi.");
+  }
+  const st = await lockStatus(session);
+  if (st.locked_by && st.locked_by !== st.own_scope.scope) {
+    return forbidden("Aplikasi dikunci oleh tingkat yang lebih tinggi.");
+  }
+  const { error } = await supabase.from("kunci_aplikasi").upsert({
+    scope: st.own_scope.scope,
+    ref_id: st.own_scope.ref,
+    locked,
+    updated_by: session.username,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) return { success: false, message: "Gagal mengubah status: " + error.message };
+  return { success: true, locked, message: locked ? "Aplikasi dikunci." : "Aplikasi dibuka." };
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard eksekutif (Kepala Bapas, Kanwil, Ditjen)
+// Indeks payload: [0]=asesor [5]=usia [24]=zat [101]=skor [102]=kategori
+// [103]=klaster [104]=sidang TPP (lihat submitData() di index.html).
+// ---------------------------------------------------------------------------
+function countBy(rows: unknown[][], idx: number): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const p of rows) {
+    const k = String(p[idx] ?? "").trim() || "-";
+    out[k] = (out[k] ?? 0) + 1;
+  }
+  return out;
+}
+
+function summarize(groups: Map<string, { nama: string; payloads: unknown[][] }>) {
+  return [...groups.values()].map((g) => {
+    const kat = countBy(g.payloads, 102);
+    const skor = g.payloads.map((p) => parseFloat(String(p[101])) || 0);
+    return {
+      nama: g.nama,
+      total: g.payloads.length,
+      layak: kat["LAYAK"] ?? 0,
+      bersyarat: kat["LAYAK BERSYARAT"] ?? 0,
+      tidak: kat["TIDAK LAYAK"] ?? 0,
+      ditunda: kat["DITUNDA"] ?? 0,
+      rata_skor: skor.length ? Math.round((skor.reduce((a, b) => a + b, 0) / skor.length) * 10) / 10 : 0,
+    };
+  }).sort((a, b) => b.total - a.total);
+}
+
+async function getStatistik(session: SessionPayload, kanwilFilter?: string, uptFilter?: string) {
+  if (session.tingkat === "UPT" && !isKepalaBapas(session)) {
+    return forbidden("Dashboard eksekutif hanya untuk Kepala Bapas, Kanwil, dan Ditjen.");
+  }
+
+  // Daftar UPT dalam lingkup pemanggil (untuk opsi filter & pembatasan).
+  let uptQuery = supabase.from("upt").select("id, nama, kanwil_id, kanwil:kanwil_id(id, nama)").order("nama");
+  if (session.tingkat === "UPT") uptQuery = uptQuery.eq("id", session.upt_id);
+  else if (session.tingkat === "KANWIL") uptQuery = uptQuery.eq("kanwil_id", session.kanwil_id);
+  const { data: uptList, error: uptErr } = await uptQuery;
+  if (uptErr) return { success: false, message: uptErr.message };
+  // deno-lint-ignore no-explicit-any
+  let scopeUpts = (uptList ?? []) as any[];
+  if (session.tingkat === "DITJEN" && kanwilFilter) scopeUpts = scopeUpts.filter((u) => u.kanwil_id === kanwilFilter);
+  if (session.tingkat !== "UPT" && uptFilter) scopeUpts = scopeUpts.filter((u) => u.id === uptFilter);
+  const uptIds = scopeUpts.map((u) => u.id as string);
+
+  // deno-lint-ignore no-explicit-any
+  const records: any[] = [];
+  if (uptIds.length > 0) {
+    const PAGE = 1000;
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase
+        .from("hasil_asesmen")
+        .select("payload, created_at, updated_at, upt_id")
+        .in("upt_id", uptIds)
+        .order("created_at")
+        .range(from, from + PAGE - 1);
+      if (error) return { success: false, message: error.message };
+      records.push(...(data ?? []));
+      if (!data || data.length < PAGE) break;
+    }
+  }
+
+  const payloads = records.map((r) => r.payload as unknown[]);
+  const skor = payloads.map((p) => parseFloat(String(p[101])) || 0);
+  const rata = skor.length ? Math.round((skor.reduce((a, b) => a + b, 0) / skor.length) * 10) / 10 : 0;
+
+  const usia = { "<=20": 0, "21-30": 0, "31-40": 0, "41-50": 0, ">50": 0, "-": 0 } as Record<string, number>;
+  for (const p of payloads) {
+    const u = parseInt(String(p[5]));
+    const k = isNaN(u) ? "-" : u <= 20 ? "<=20" : u <= 30 ? "21-30" : u <= 40 ? "31-40" : u <= 50 ? "41-50" : ">50";
+    usia[k]++;
+  }
+
+  const bulanan: Record<string, number> = {};
+  for (const r of records) {
+    const b = String(r.created_at).slice(0, 7);
+    bulanan[b] = (bulanan[b] ?? 0) + 1;
+  }
+  const weekAgo = Date.now() - 7 * 86400000;
+
+  const group = (keyOf: (r: any) => [string, string]) => { // deno-lint-ignore no-explicit-any
+    const m = new Map<string, { nama: string; payloads: unknown[][] }>();
+    for (const r of records) {
+      const [k, nama] = keyOf(r);
+      if (!m.has(k)) m.set(k, { nama, payloads: [] });
+      m.get(k)!.payloads.push(r.payload as unknown[]);
+    }
+    return summarize(m);
+  };
+  const uptById = new Map(scopeUpts.map((u) => [u.id as string, u]));
+
+  const result: Record<string, unknown> = {
+    success: true,
+    tingkat: session.tingkat,
+    total: records.length,
+    rata_skor: rata,
+    diedit_7hari: records.filter((r) => new Date(r.updated_at).getTime() >= weekAgo && r.updated_at !== r.created_at).length,
+    jumlah_upt: scopeUpts.length,
+    kategori: countBy(payloads, 102),
+    klaster: countBy(payloads, 103),
+    tpp: countBy(payloads, 104),
+    zat: countBy(payloads, 24),
+    usia,
+    bulanan: Object.entries(bulanan).sort().slice(-12).map(([bulan, n]) => ({ bulan, n })),
+    per_upt: group((r) => [r.upt_id, uptById.get(r.upt_id)?.nama ?? "-"]),
+    options: {
+      kanwil: session.tingkat === "DITJEN"
+        ? [...new Map((uptList ?? []).map((u: any) => [u.kanwil?.id, u.kanwil?.nama])).entries()] // deno-lint-ignore no-explicit-any
+          .filter(([id]) => id).map(([id, nama]) => ({ id, nama }))
+        : [],
+      upt: (uptList ?? []).map((u: any) => ({ id: u.id, nama: u.nama, kanwil_id: u.kanwil_id })), // deno-lint-ignore no-explicit-any
+    },
+  };
+  if (session.tingkat === "DITJEN") {
+    result.per_kanwil = group((r) => {
+      const u = uptById.get(r.upt_id);
+      return [u?.kanwil_id ?? "-", u?.kanwil?.nama ?? "-"];
+    });
+  }
+  if (session.tingkat === "UPT") {
+    result.per_asesor = group((r) => {
+      const a = String((r.payload as unknown[])[0] ?? "-");
+      return [a, a];
+    });
+  }
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -719,9 +946,15 @@ async function updateDitjenProfile(session: SessionPayload, payload: Record<stri
 // KANWIL lain di provinsi yang sama (tidak termasuk user DITJEN).
 // ---------------------------------------------------------------------------
 async function listUsers(session: SessionPayload) {
-  if (session.tingkat === "UPT") return forbidden();
+  if (session.tingkat === "UPT" && !isKepalaBapas(session)) return forbidden();
 
   const selectCols = "username, nama, peran, tingkat, upt_id, kanwil_id, upt:upt_id(nama), kanwil:kanwil_id(nama)";
+
+  if (session.tingkat === "UPT") {
+    const { data, error } = await supabase.from("users").select(selectCols).eq("upt_id", session.upt_id).order("username");
+    if (error) return { success: false, message: error.message };
+    return { success: true, data };
+  }
 
   if (session.tingkat === "DITJEN") {
     const { data, error } = await supabase.from("users").select(selectCols).order("username");
@@ -755,6 +988,8 @@ async function canManageTargetUser(
   kanwil_id: string | null,
 ): Promise<boolean> {
   if (session.tingkat === "DITJEN") return true;
+  // Kepala Bapas: hanya user tingkat UPT pada UPT-nya sendiri.
+  if (isKepalaBapas(session)) return tingkat === "UPT" && !!upt_id && upt_id === session.upt_id;
   if (session.tingkat !== "KANWIL") return false;
   if (tingkat === "DITJEN") return false;
   if (tingkat === "KANWIL") return kanwil_id === session.kanwil_id;
@@ -765,7 +1000,7 @@ async function canManageTargetUser(
 }
 
 async function createUser(session: SessionPayload, payload: Record<string, unknown>) {
-  if (session.tingkat === "UPT") return forbidden();
+  if (session.tingkat === "UPT" && !isKepalaBapas(session)) return forbidden();
   const { username, password, nama, peran, tingkat, upt_id, kanwil_id } = payload as {
     username: string; password: string; nama: string; peran: string;
     tingkat: Tingkat; upt_id: string | null; kanwil_id: string | null;
@@ -791,7 +1026,7 @@ async function createUser(session: SessionPayload, payload: Record<string, unkno
 }
 
 async function updateUser(session: SessionPayload, username: string, payload: Record<string, unknown>) {
-  if (session.tingkat === "UPT") return forbidden();
+  if (session.tingkat === "UPT" && !isKepalaBapas(session)) return forbidden();
 
   const { data: existing, error: findError } = await supabase
     .from("users")
@@ -825,7 +1060,7 @@ async function updateUser(session: SessionPayload, username: string, payload: Re
 }
 
 async function deleteUser(session: SessionPayload, username: string) {
-  if (session.tingkat === "UPT") return forbidden();
+  if (session.tingkat === "UPT" && !isKepalaBapas(session)) return forbidden();
   if (username === session.username) return { success: false, message: "Tidak dapat menghapus akun sendiri." };
 
   const { data: existing, error: findError } = await supabase
