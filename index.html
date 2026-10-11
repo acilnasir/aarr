@@ -104,17 +104,25 @@
         <h5 class="m-0">Daftar Hasil Asesmen Narapidana</h5>
         <button class="btn btn-sm btn-info text-white" onclick="loadDataList()">🔄 Refresh Data</button>
       </div>
+      <div class="row g-2 mb-3">
+        <div class="col-md-4"><input type="search" class="form-control form-control-sm" id="fltSearch" placeholder="🔍 Cari nama, no. register, asesor, UPT..." oninput="renderDataTable()"></div>
+        <div class="col-md-2"><select class="form-select form-select-sm" id="fltAsesor" onchange="renderDataTable()"><option value="">Semua Asesor</option></select></div>
+        <div class="col-md-2"><select class="form-select form-select-sm d-none" id="fltUpt" onchange="renderDataTable()"><option value="">Semua UPT</option></select></div>
+        <div class="col-md-2"><select class="form-select form-select-sm" id="fltKategori" onchange="renderDataTable()"><option value="">Semua Kategori</option><option>LAYAK</option><option>LAYAK BERSYARAT</option><option>TIDAK LAYAK</option><option>DITUNDA</option></select></div>
+        <div class="col-md-2"><select class="form-select form-select-sm" id="fltEdit" onchange="renderDataTable()"><option value="">Semua waktu edit</option><option value="1">Diedit 24 jam terakhir</option><option value="7">Diedit 7 hari terakhir</option><option value="30">Diedit 30 hari terakhir</option></select></div>
+        <div class="col-12 d-flex justify-content-between align-items-center"><small class="text-muted" id="dataCount"></small><button class="btn btn-sm btn-link" onclick="resetFilter()">Reset filter</button></div>
+      </div>
       <div class="table-responsive">
         <table class="table table-bordered table-hover align-middle">
-          <thead class="table-dark">
+          <thead class="table-dark" id="dataTableHead">
             <tr>
-              <th>ID/Waktu</th><th>Asesor</th><th>No. Register</th><th>Nama Narapidana</th><th>UPT</th>
-              <th class="d-none" id="thUptAsesor">UPT Asesor</th><th class="d-none" id="thKanwilAsesor">Kanwil</th>
-              <th>Skor</th><th>Kategori Akhir</th><th>Aksi</th>
+              <th data-sort="waktu"  class="" style="cursor:pointer;white-space:nowrap;" onclick="setSort('waktu')">ID/Waktu Input <span class="sort-ind"></span></th><th data-sort="updated"  class="" style="cursor:pointer;white-space:nowrap;" onclick="setSort('updated')">Terakhir Diedit <span class="sort-ind"></span></th><th data-sort="asesor"  class="" style="cursor:pointer;white-space:nowrap;" onclick="setSort('asesor')">Asesor <span class="sort-ind"></span></th><th data-sort="noreg"  class="" style="cursor:pointer;white-space:nowrap;" onclick="setSort('noreg')">No. Register <span class="sort-ind"></span></th><th data-sort="nama"  class="" style="cursor:pointer;white-space:nowrap;" onclick="setSort('nama')">Nama Narapidana <span class="sort-ind"></span></th><th data-sort="upt"  class="" style="cursor:pointer;white-space:nowrap;" onclick="setSort('upt')">UPT <span class="sort-ind"></span></th>
+              <th data-sort="uptAsesor" id="thUptAsesor" class="d-none" style="cursor:pointer;white-space:nowrap;" onclick="setSort('uptAsesor')">UPT Asesor <span class="sort-ind"></span></th><th data-sort="kanwil" id="thKanwilAsesor" class="d-none" style="cursor:pointer;white-space:nowrap;" onclick="setSort('kanwil')">Kanwil <span class="sort-ind"></span></th>
+              <th data-sort="skor"  class="" style="cursor:pointer;white-space:nowrap;" onclick="setSort('skor')">Skor <span class="sort-ind"></span></th><th data-sort="kategori"  class="" style="cursor:pointer;white-space:nowrap;" onclick="setSort('kategori')">Kategori Akhir <span class="sort-ind"></span></th><th>Aksi</th>
             </tr>
           </thead>
           <tbody id="dataTableBody">
-            <tr><td colspan="8" class="text-center">Memuat data...</td></tr>
+            <tr><td colspan="10" class="text-center">Memuat data...</td></tr>
           </tbody>
         </table>
       </div>
@@ -521,36 +529,106 @@
     loadDataList();
   }
 
+  let allRows = [];
+  let sortKey = 'updated', sortDir = -1;
+
   function loadDataList() {
-    let tbody = document.getElementById('dataTableBody'); tbody.innerHTML = `<tr><td colspan="8" class="text-center">Mengambil data dari Server...</td></tr>`;
+    let tbody = document.getElementById('dataTableBody'); tbody.innerHTML = `<tr><td colspan="10" class="text-center">Mengambil data dari Server...</td></tr>`;
     callApi("read").then(r => {
-      if(r.success && r.data.length > 0) {
-        tbody.innerHTML = ""; globalDataMap = {};
-        r.data.forEach(row => {
-          let id = row[0]; globalDataMap[id] = row;
-          
-          // Render Action Buttons
-          let aksiHtml = `<button class="btn btn-sm btn-success" onclick="cetakData('${id}')">🖨️ PDF Full</button>`;
-          // Sembunyikan tombol Edit & Hapus jika terkunci, atau jika user bukan tingkat UPT (Kanwil/Ditjen hanya memantau)
-          if(!KUNCI_APLIKASI && userTingkat === 'UPT') {
-            aksiHtml += ` <button class="btn btn-sm btn-primary" onclick="editData('${id}')">✏️ Edit</button>
-                          <button class="btn btn-sm btn-danger" onclick="deleteData('${id}')">🗑️ Hapus</button>`;
-          }
-
-          // Kolom "UPT Asesor"/"Kanwil" (indeks 106/107) hanya ditampilkan untuk Kanwil/Ditjen.
-          let kolomUptKanwil = userTingkat === 'UPT' ? '' : `<td>${row[106] || '-'}</td><td>${row[107] || '-'}</td>`;
-
-          let tr = `<tr>
-            <td><small class="text-muted">${id}</small></td>
-            <td>${row[1]}</td><td>${row[3]}</td><td class="fw-bold">${row[2]}</td>
-            <td>${row[4]}</td>${kolomUptKanwil}<td><span class="badge bg-secondary">${row[102]}</span></td>
-            <td><span class="badge ${row[103]==='LAYAK'?'bg-primary':row[103].includes('BERSYARAT')?'bg-warning text-dark':'bg-danger'}">${row[103]}</span></td>
-            <td>${aksiHtml}</td>
-          </tr>`;
-          tbody.innerHTML += tr;
-        });
-      } else { tbody.innerHTML = `<tr><td colspan="8" class="text-center">Belum ada data.</td></tr>`; }
+      globalDataMap = {};
+      allRows = r.success ? r.data : [];
+      allRows.forEach(row => globalDataMap[row[0]] = row);
+      fillFilterOptions();
+      renderDataTable();
     });
+  }
+
+  const sortGetters = {
+    waktu: r => r[0] || '',
+    updated: r => r[110] || '',
+    asesor: r => (r[1] || '').toLowerCase(),
+    noreg: r => (r[3] || '').toLowerCase(),
+    nama: r => (r[2] || '').toLowerCase(),
+    upt: r => (r[4] || '').toLowerCase(),
+    uptAsesor: r => (r[106] || '').toLowerCase(),
+    kanwil: r => (r[107] || '').toLowerCase(),
+    skor: r => parseFloat(r[102]) || 0,
+    kategori: r => (r[103] || '').toLowerCase()
+  };
+
+  function fmtWaktu(iso) {
+    if (!iso) return '-';
+    const d = new Date(iso);
+    if (isNaN(d)) return escHtml(iso);
+    return d.toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function fillFilterOptions() {
+    const fill = (id, idx, label) => {
+      const el = document.getElementById(id), cur = el.value;
+      const vals = [...new Set(allRows.map(r => r[idx]).filter(Boolean))].sort();
+      el.innerHTML = `<option value="">${label}</option>` + vals.map(v => `<option>${escHtml(v)}</option>`).join('');
+      el.value = vals.includes(cur) ? cur : '';
+    };
+    fill('fltAsesor', 1, 'Semua Asesor');
+    fill('fltUpt', 4, 'Semua UPT');
+    document.getElementById('fltUpt').classList.toggle('d-none', userTingkat === 'UPT');
+  }
+
+  function setSort(key) {
+    if (sortKey === key) sortDir = -sortDir; else { sortKey = key; sortDir = (key === 'waktu' || key === 'updated' || key === 'skor') ? -1 : 1; }
+    renderDataTable();
+  }
+
+  function resetFilter() {
+    ['fltSearch', 'fltAsesor', 'fltUpt', 'fltKategori', 'fltEdit'].forEach(id => document.getElementById(id).value = '');
+    renderDataTable();
+  }
+
+  function renderDataTable() {
+    const q = document.getElementById('fltSearch').value.trim().toLowerCase();
+    const fa = document.getElementById('fltAsesor').value, fu = document.getElementById('fltUpt').value;
+    const fk = document.getElementById('fltKategori').value, fe = document.getElementById('fltEdit').value;
+    const cutoff = fe ? Date.now() - parseInt(fe) * 86400000 : 0;
+
+    let rows = allRows.filter(r => {
+      if (fa && r[1] !== fa) return false;
+      if (fu && r[4] !== fu) return false;
+      if (fk && r[103] !== fk) return false;
+      if (cutoff && !(new Date(r[110]).getTime() >= cutoff)) return false;
+      if (q && ![r[1], r[2], r[3], r[4], r[106], r[107], r[0]].join(' ').toLowerCase().includes(q)) return false;
+      return true;
+    });
+    const g = sortGetters[sortKey];
+    rows.sort((x, y) => { const a = g(x), b = g(y); return (a < b ? -1 : a > b ? 1 : 0) * sortDir; });
+
+    document.querySelectorAll('#dataTableHead th[data-sort]').forEach(th => {
+      const k = th.dataset.sort;
+      th.querySelector('.sort-ind').textContent = k === sortKey ? (sortDir > 0 ? '▲' : '▼') : '';
+    });
+    document.getElementById('dataCount').textContent = `${rows.length} dari ${allRows.length} data`;
+
+    let tbody = document.getElementById('dataTableBody');
+    if (!rows.length) { tbody.innerHTML = `<tr><td colspan="10" class="text-center">${allRows.length ? 'Tidak ada data yang cocok.' : 'Belum ada data.'}</td></tr>`; return; }
+    const recent = Date.now() - 86400000;
+    tbody.innerHTML = rows.map(row => {
+      const id = row[0];
+      let aksiHtml = `<button class="btn btn-sm btn-success" onclick="cetakData('${id}')">🖨️ PDF Full</button>`;
+      if (!KUNCI_APLIKASI && userTingkat === 'UPT') {
+        aksiHtml += ` <button class="btn btn-sm btn-primary" onclick="editData('${id}')">✏️ Edit</button>
+                      <button class="btn btn-sm btn-danger" onclick="deleteData('${id}')">🗑️ Hapus</button>`;
+      }
+      const kolomUptKanwil = userTingkat === 'UPT' ? '' : `<td>${escHtml(row[106] || '-')}</td><td>${escHtml(row[107] || '-')}</td>`;
+      const diedit = row[110] && row[110] !== row[0] && new Date(row[110]).getTime() > recent ? ' <span class="badge bg-info text-dark">baru</span>' : '';
+      return `<tr>
+        <td><small class="text-muted">${escHtml(id)}</small></td>
+        <td><small>${fmtWaktu(row[110])}</small>${diedit}</td>
+        <td>${escHtml(row[1])}</td><td>${escHtml(row[3])}</td><td class="fw-bold">${escHtml(row[2])}</td>
+        <td>${escHtml(row[4])}</td>${kolomUptKanwil}<td><span class="badge bg-secondary">${escHtml(row[102])}</span></td>
+        <td><span class="badge ${row[103]==='LAYAK'?'bg-primary':(row[103]||'').includes('BERSYARAT')?'bg-warning text-dark':'bg-danger'}">${escHtml(row[103])}</span></td>
+        <td>${aksiHtml}</td>
+      </tr>`;
+    }).join('');
   }
 
   function cetakData(id) {

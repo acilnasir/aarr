@@ -384,7 +384,7 @@ async function readDataAsesmen(session: SessionPayload) {
 
   let query = supabase
     .from("hasil_asesmen")
-    .select("id, payload, upt_id, wali_username, nakes_username, upt:upt_id(nama, kanwil:kanwil_id(nama))")
+    .select("id, payload, upt_id, wali_username, nakes_username, updated_at, upt:upt_id(nama, kanwil:kanwil_id(nama))")
     .order("created_at", { ascending: false });
   if (uptIds !== null) {
     query = query.in("upt_id", uptIds);
@@ -406,6 +406,7 @@ async function readDataAsesmen(session: SessionPayload) {
     row.upt?.kanwil?.nama ?? "",
     row.wali_username ?? "",
     row.nakes_username ?? "",
+    row.updated_at ?? "",
   ]);
   return { success: true, data: records };
 }
