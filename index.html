@@ -89,6 +89,9 @@
     <li class="nav-item d-none" id="tabWilayahContainer">
       <button class="nav-link fw-bold text-dark" data-bs-toggle="tab" data-bs-target="#tabWilayah" type="button" onclick="loadKanwilList()">🏢 Kelola Wilayah</button>
     </li>
+    <li class="nav-item" id="tabWilayahKerjaContainer">
+      <button class="nav-link fw-bold text-dark" data-bs-toggle="tab" data-bs-target="#tabWilayahKerja" type="button" onclick="loadWilayahKerja()">🗺️ Wilayah Kerja Bapas</button>
+    </li>
     <li class="nav-item d-none" id="tabUptContainer">
       <button class="nav-link fw-bold text-dark" data-bs-toggle="tab" data-bs-target="#tabUpt" type="button" onclick="loadUptList()">🏛️ Kelola UPT</button>
     </li>
@@ -305,10 +308,12 @@
             
             <h6 class="mt-4 fw-bold">Penandatangan Pengesahan</h6>
             <div class="row g-3">
-              <div class="col-md-6"><label class="form-label">Wali Pemasyarakatan</label><select class="form-select" id="sel_wali"><option value="">-- Pilih --</option></select></div>
-              <div class="col-md-6"><label class="form-label">Tenaga Kesehatan</label><select class="form-select" id="sel_nakes"><option value="">-- Pilih --</option></select></div>
+              <div class="col-md-12 d-none" id="lokasiWrap"><label class="form-label">Lokasi WBP (UPT tempat warga binaan berada)</label><select class="form-select" id="sel_lokasi" onchange="loadPenandatangan(this.value)"></select></div>
+              <div class="col-md-4"><label class="form-label">Wali Pemasyarakatan</label><select class="form-select" id="sel_wali"><option value="">-- Pilih --</option></select></div>
+              <div class="col-md-4"><label class="form-label">Tenaga Kesehatan</label><select class="form-select" id="sel_nakes"><option value="">-- Pilih --</option></select></div>
+              <div class="col-md-4"><label class="form-label">Asesor</label><select class="form-select" id="sel_asesor"></select></div>
             </div>
-            <div class="form-text">Asesor adalah user yang menginput. Tanda tangan diunggah masing-masing user lewat tombol "Tanda Tangan Saya".</div>
+            <div class="form-text">Wali, tenaga kesehatan, dan asesor dapat mengisi dan saling mengedit asesmen ini. Asesor boleh dari UPT lokasi WBP atau Bapas yang mencakup wilayah kerjanya. Tanda tangan diunggah masing-masing user lewat tombol "Tanda Tangan Saya".</div>
 
             <hr class="mt-5">
             <button type="button" class="btn btn-primary btn-lg w-100 shadow" id="btnSimpan" onclick="submitData()">💾 SIMPAN DATA</button>
@@ -342,6 +347,20 @@
         <table class="table table-bordered table-hover align-middle">
           <thead class="table-dark"><tr><th>Nama UPT</th><th>Jenis</th><th>Kanwil</th><th>Kepala UPT</th><th>Alamat</th><th>Aksi</th></tr></thead>
           <tbody id="uptTableBody"><tr><td colspan="6" class="text-center">Memuat data...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- WILAYAH KERJA BAPAS -->
+    <div class="tab-pane fade" id="tabWilayahKerja">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="m-0">Wilayah Kerja Balai Pemasyarakatan</h5>
+      </div>
+      <div class="form-text mb-3">Daftar Lapas/Rutan/LPKA yang menjadi wilayah kerja tiap Bapas. Asesor dari Bapas dapat melaksanakan asesmen di UPT yang tercantum.</div>
+      <div class="table-responsive">
+        <table class="table table-bordered table-hover align-middle">
+          <thead class="table-dark"><tr><th>Bapas</th><th>Kanwil</th><th>Wilayah Kerja (Lapas/Rutan/LPKA)</th><th>Aksi</th></tr></thead>
+          <tbody id="wilayahKerjaBody"><tr><td colspan="4" class="text-center">Memuat data...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -426,6 +445,7 @@
   const API_URL = "https://nicvhbztcjdmralzgqqm.functions.supabase.co/api"; 
 
   let asr = "";
+  let sessionUsername = "";
   let userJabatan = "";
   let globalDataMap = {}; 
   let activeEditNoreg = null; 
@@ -496,7 +516,8 @@
       try {
         let r = JSON.parse(text);
         if(r.success) { 
-          asr = r.user.nama; 
+          asr = r.user.nama;
+          sessionUsername = r.user.username; 
           userJabatan = r.user.peran || ""; // field asli dari backend bernama "peran", bukan "jabatan"
           sessionToken = r.token;
           userTingkat = r.user.tingkat || "UPT";
@@ -510,6 +531,7 @@
           loadKunci();
           document.getElementById('btnExport').classList.toggle('d-none', !isPimpinanUI());
           loadPenandatangan();
+          loadLokasiAsesmen();
           loadDataList(); 
         }
         else { alert(r.message); btn.innerText = "Masuk"; btn.disabled = false; }
@@ -955,23 +977,51 @@
     };
     return `<table width="100%" style="margin-top:30px; font-size:11px; page-break-inside:avoid;"><tr>
       ${col('Wali Pemasyarakatan', r && r.wali, '')}
-      ${col('Asesor', r && r.asesor, d[1])}
       ${col('Tenaga Kesehatan', r && r.nakes, '')}
+      ${col('Asesor', r && r.asesor, d[0])}
     </tr></table>`;
   }
 
   // ---- Tanda tangan saya ----
   let ttdDraft = null;
 
-  function loadPenandatangan() {
-    if (userTingkat !== 'UPT') return;
-    callApi('listPenandatangan').then(r => {
-      if (!r.success) return;
+  let lokasiInfo = null; // { own, is_bapas, wilayah }
+  let penandatanganSeq = 0;
+
+  // Memuat calon penandatangan untuk UPT lokasi WBP; selected = {wali, nakes, asesor} untuk mode edit.
+  function loadPenandatangan(lokasiUptId, selected) {
+    if (userTingkat !== 'UPT') return Promise.resolve();
+    const seq = ++penandatanganSeq;
+    return callApi('listPenandatangan', { upt_id: lokasiUptId || null }).then(r => {
+      if (!r.success || seq !== penandatanganSeq) return;
+      const prev = selected || {
+        wali: document.getElementById('sel_wali').value,
+        nakes: document.getElementById('sel_nakes').value,
+        asesor: document.getElementById('sel_asesor').value,
+      };
+      const opt = u => `<option value="${escHtml(u.username)}" data-nama="${escHtml(u.nama)}">${escHtml(u.nama)} (${escHtml(u.peran || '')})${u.upt_nama && u.upt_id !== (lokasiUptId || userUptId) ? ' - ' + escHtml(u.upt_nama) : ''}${u.has_ttd ? '' : ' - belum ada TTD'}</option>`;
       ['sel_wali', 'sel_nakes'].forEach(id => {
-        const sel = document.getElementById(id);
-        sel.innerHTML = '<option value="">-- Pilih --</option>' + r.data.map(u =>
-          `<option value="${escHtml(u.username)}">${escHtml(u.nama)} (${escHtml(u.peran || '')})${u.has_ttd ? '' : ' - belum ada TTD'}</option>`).join('');
+        document.getElementById(id).innerHTML = '<option value="">-- Pilih --</option>' + r.data.map(opt).join('');
       });
+      document.getElementById('sel_asesor').innerHTML = (r.asesor || r.data).map(opt).join('');
+      document.getElementById('sel_wali').value = prev.wali || '';
+      document.getElementById('sel_nakes').value = prev.nakes || '';
+      document.getElementById('sel_asesor').value = prev.asesor || sessionUsername;
+    });
+  }
+
+  // Pilihan lokasi WBP: hanya tampil untuk user Bapas yang punya wilayah kerja.
+  function loadLokasiAsesmen() {
+    if (userTingkat !== 'UPT') return;
+    callApi('getLokasiAsesmen').then(r => {
+      if (!r.success) return;
+      lokasiInfo = r;
+      const wrap = document.getElementById('lokasiWrap');
+      const show = r.is_bapas && r.wilayah.length > 0;
+      wrap.classList.toggle('d-none', !show);
+      document.getElementById('sel_lokasi').innerHTML = show
+        ? [r.own].concat(r.wilayah).map(u => `<option value="${escHtml(u.id)}">${escHtml(u.nama)}${u.id === r.own.id ? ' (UPT saya)' : ''}</option>`).join('')
+        : '';
     });
   }
 
@@ -1098,8 +1148,13 @@
     
     ['val_skorM4D','val_gt','val_kat','val_klaster','val_tpp'].forEach((tid, i) => document.getElementById(tid).value = d[i+101] || "");
     
-    document.getElementById('sel_wali').value = d[108] || "";
-    document.getElementById('sel_nakes').value = d[109] || "";
+    const lokasiSel = document.getElementById('sel_lokasi');
+    if (d[112] && !Array.from(lokasiSel.options).some(o => o.value === d[112])) {
+      lokasiSel.innerHTML = `<option value="${escHtml(d[112])}">${escHtml(d[107] || d[112])}</option>`;
+    } else if (d[112]) lokasiSel.value = d[112];
+    lokasiSel.disabled = true;
+    document.getElementById('lokasiWrap').classList.toggle('d-none', !(lokasiInfo && lokasiInfo.is_bapas) && d[112] === userUptId);
+    loadPenandatangan(d[112] === userUptId ? null : d[112], { wali: d[108] || '', nakes: d[109] || '', asesor: d[111] || '' });
     calcTotal(); 
     
     let btn = document.getElementById('btnSimpan');
@@ -1111,6 +1166,9 @@
     activeEditNoreg = null;
     document.getElementById('editAlert').classList.add('d-none');
     document.getElementById('formAsesmen').reset();
+    document.getElementById('sel_lokasi').disabled = false;
+    loadLokasiAsesmen();
+    loadPenandatangan(null, { wali: '', nakes: '', asesor: sessionUsername });
     let btn = document.getElementById('btnSimpan');
     btn.innerText = "💾 SIMPAN DATA BARU";
     btn.classList.replace("btn-warning", "btn-primary");
@@ -1136,7 +1194,9 @@
   function submitData() {
     let btn = document.getElementById('btnSimpan'); btn.disabled = true; btn.innerText = "Menyimpan ke Server...";
     
-    let arr = [ asr, document.getElementById('id_nama').value, document.getElementById('id_noreg').value, document.getElementById('id_upt').value, document.getElementById('id_ttl').value, document.getElementById('id_usia').value, document.getElementById('id_tglasesmen').value, document.getElementById('id_pasal').value, document.getElementById('id_lamapidana').value,
+    const asesorSel = document.getElementById('sel_asesor');
+    const asesorNama = asesorSel.selectedOptions[0] ? asesorSel.selectedOptions[0].dataset.nama : asr;
+    let arr = [ asesorNama || asr, document.getElementById('id_nama').value, document.getElementById('id_noreg').value, document.getElementById('id_upt').value, document.getElementById('id_ttl').value, document.getElementById('id_usia').value, document.getElementById('id_tglasesmen').value, document.getElementById('id_pasal').value, document.getElementById('id_lamapidana').value,
       document.getElementById('m0_1').value, document.getElementById('m0_2').value, document.getElementById('m0_3').value, document.getElementById('m0_4').value, document.getElementById('m0_5').value, document.getElementById('m0_6').value, document.getElementById('m0_7').value, document.getElementById('m0_8').value, document.getElementById('m0_9').value, document.getElementById('m0_hasil').value,
       document.getElementById('m1_pasal').value, document.getElementById('m1_bb').value, document.getElementById('m1_peran').value, document.getElementById('m1_tat').value, document.getElementById('m1_urin').value, document.getElementById('m1_zat').value, document.getElementById('m1_usia').value, document.getElementById('m1_lama').value, document.getElementById('m1_frek').value, document.getElementById('m1_cara').value, document.getElementById('m1_terakhir').value, document.getElementById('m1_rehab').value, document.getElementById('m1_berhenti').value
     ];
@@ -1155,6 +1215,10 @@
     let extra = activeEditNoreg ? { id: activeEditNoreg, payload: arr } : { payload: arr };
     extra.wali = document.getElementById('sel_wali').value;
     extra.nakes = document.getElementById('sel_nakes').value;
+    extra.asesor = asesorSel.value || sessionUsername;
+    if (!activeEditNoreg && !document.getElementById('lokasiWrap').classList.contains('d-none')) {
+      extra.lokasi_upt_id = document.getElementById('sel_lokasi').value;
+    }
 
     callApi(actionName, extra).then(r => {
       alert(r.message); 
@@ -1165,6 +1229,49 @@
     }).catch(err => {
       alert("Error: " + err);
       btn.disabled = false; btn.innerText = activeEditNoreg ? "🔄 UPDATE DATA ASESMEN" : "💾 SIMPAN DATA BARU";
+    });
+  }
+
+  // =========================================================================
+  // WILAYAH KERJA BAPAS
+  // =========================================================================
+  let wilayahKerjaData = null;
+
+  function loadWilayahKerja() {
+    const tbody = document.getElementById('wilayahKerjaBody');
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center">Memuat data...</td></tr>`;
+    callApi('listWilayahKerja').then(r => {
+      if (!r.success) { tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">${escHtml(r.message)}</td></tr>`; return; }
+      wilayahKerjaData = r;
+      if (r.bapas.length === 0) { tbody.innerHTML = `<tr><td colspan="4" class="text-center">Belum ada data Bapas.</td></tr>`; return; }
+      tbody.innerHTML = r.bapas.map(b => `<tr>
+        <td>${escHtml(b.nama)}</td><td>${escHtml(b.kanwil_nama)}</td>
+        <td>${b.wilayah.length ? b.wilayah.map(w => `<span class="badge bg-secondary me-1 mb-1">${escHtml(w.nama)}</span>`).join('') : '<span class="text-muted">Belum ada</span>'}</td>
+        <td>${b.can_manage ? `<button class="btn btn-sm btn-primary" onclick="openWilayahKerjaModal('${b.id}')">✏️ Atur</button>` : '-'}</td>
+      </tr>`).join('');
+    });
+  }
+
+  function openWilayahKerjaModal(bapasId) {
+    const b = wilayahKerjaData.bapas.find(x => x.id === bapasId);
+    if (!b) return;
+    adminModalMode = { type: 'wilayahkerja', id: bapasId };
+    document.getElementById('adminModalTitle').innerText = 'Wilayah Kerja ' + b.nama;
+    const chosen = new Set(b.wilayah.map(w => w.id));
+    const cand = wilayahKerjaData.kandidat.filter(k => k.kanwil_id === b.kanwil_id);
+    document.getElementById('adminModalBody').innerHTML = cand.length === 0
+      ? '<div class="text-muted">Belum ada Lapas/Rutan/LPKA pada provinsi ini. Tambahkan lebih dulu di Kelola UPT.</div>'
+      : `<input type="search" class="form-control form-control-sm mb-2" placeholder="Cari UPT..." oninput="document.querySelectorAll('#wkList label').forEach(l => l.style.display = l.innerText.toLowerCase().includes(this.value.toLowerCase()) ? '' : 'none')">
+         <div id="wkList" style="max-height:50vh; overflow:auto;">${cand.map(k => `
+         <label class="d-block border-bottom py-1"><input type="checkbox" class="form-check-input me-2 wk-chk" value="${k.id}" ${chosen.has(k.id) ? 'checked' : ''}>${escHtml(k.nama)} <small class="text-muted">(${escHtml(k.jenis)})</small></label>`).join('')}</div>`;
+    getAdminModal().show();
+  }
+
+  function saveWilayahKerja() {
+    const ids = Array.from(document.querySelectorAll('.wk-chk:checked')).map(c => c.value);
+    return callApi('setWilayahKerja', { bapas_id: adminModalMode.id, upt_ids: ids }).then(r => {
+      alert(r.message);
+      if (r.success) { getAdminModal().hide(); loadWilayahKerja(); loadLokasiAsesmen(); }
     });
   }
 
@@ -1365,6 +1472,7 @@
     if (!adminModalMode) return;
     let type = adminModalMode.type, id = adminModalMode.id;
 
+    if (type === 'wilayahkerja') { saveWilayahKerja(); return; }
     if (type === 'kanwil') {
       let payload = {
         nama: document.getElementById('am_nama').value,
