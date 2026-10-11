@@ -89,7 +89,7 @@
     <li class="nav-item d-none" id="tabWilayahContainer">
       <button class="nav-link fw-bold text-dark" data-bs-toggle="tab" data-bs-target="#tabWilayah" type="button" onclick="loadKanwilList()">🏢 Kelola Wilayah</button>
     </li>
-    <li class="nav-item" id="tabWilayahKerjaContainer">
+    <li class="nav-item d-none" id="tabWilayahKerjaContainer">
       <button class="nav-link fw-bold text-dark" data-bs-toggle="tab" data-bs-target="#tabWilayahKerja" type="button" onclick="loadWilayahKerja()">🗺️ Wilayah Kerja Bapas</button>
     </li>
     <li class="nav-item d-none" id="tabUptContainer">
@@ -529,6 +529,7 @@
           applyStrukturOrganisasiUI();
           loadKunci();
           document.getElementById('btnExport').classList.toggle('d-none', !isPimpinanUI());
+          document.getElementById('tabWilayahKerjaContainer').classList.toggle('d-none', !(userTingkat === 'UPT' && isPimpinanUI()));
           loadPenandatangan();
           loadLokasiAsesmen();
           loadDataList(); 
