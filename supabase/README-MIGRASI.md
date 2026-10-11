@@ -7,7 +7,7 @@ kode backend disimpan di repo ini (`supabase/`).
 ## Arsitektur baru
 
 ```
-index.html  --POST-->  Supabase Edge Function "api"  --service_role-->  Postgres (Supabase)
+web/index.html  --POST-->  Supabase Edge Function "api"  --service_role-->  Postgres (Supabase)
                         (supabase/functions/api/index.ts)                (tabel users, hasil_asesmen)
 ```
 
@@ -100,7 +100,7 @@ Supabase (lihat `supabase/import/import-data.mjs`).
 
 ## Langkah 8 - Update frontend
 
-Di `index.html`, ganti baris:
+Di `web/index.html`, ganti baris:
 
 ```js
 const API_URL = "https://xxxxxxxxxxxx.functions.supabase.co/api";
