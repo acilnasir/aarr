@@ -89,7 +89,7 @@
     <li class="nav-item d-none" id="tabWilayahContainer">
       <button class="nav-link fw-bold text-dark" data-bs-toggle="tab" data-bs-target="#tabWilayah" type="button" onclick="loadKanwilList()">🏢 Kelola Wilayah</button>
     </li>
-    <li class="nav-item" id="tabWilayahKerjaContainer">
+    <li class="nav-item d-none" id="tabWilayahKerjaContainer">
       <button class="nav-link fw-bold text-dark" data-bs-toggle="tab" data-bs-target="#tabWilayahKerja" type="button" onclick="loadWilayahKerja()">🗺️ Wilayah Kerja Bapas</button>
     </li>
     <li class="nav-item d-none" id="tabUptContainer">
@@ -180,7 +180,7 @@
             <div class="row g-2">
               <div class="col-md-3"><label class="form-label">Nama</label><input type="text" class="form-control" id="id_nama"></div>
               <div class="col-md-3"><label class="form-label">No. Register</label><input type="text" class="form-control" id="id_noreg"></div>
-              <div class="col-md-3"><label class="form-label">UPT / Kanwil</label><input type="text" class="form-control" id="id_upt"></div>
+              <div class="col-md-3"><label class="form-label">UPT / Kanwil</label><select class="form-select" id="id_upt" required onchange="loadPenandatangan(this.value)"></select></div>
               <div class="col-md-3"><label class="form-label">Tempat, Tgl Lahir</label><input type="text" class="form-control" id="id_ttl"></div>
               <div class="col-md-2"><label class="form-label">Usia</label><input type="number" class="form-control" id="id_usia"></div>
               <div class="col-md-3"><label class="form-label">Tgl Asesmen</label><input type="date" class="form-control" id="id_tglasesmen"></div>
@@ -308,7 +308,6 @@
             
             <h6 class="mt-4 fw-bold">Penandatangan Pengesahan</h6>
             <div class="row g-3">
-              <div class="col-md-12 d-none" id="lokasiWrap"><label class="form-label">Lokasi WBP (UPT tempat warga binaan berada)</label><select class="form-select" id="sel_lokasi" onchange="loadPenandatangan(this.value)"></select></div>
               <div class="col-md-4"><label class="form-label">Wali Pemasyarakatan</label><select class="form-select" id="sel_wali"><option value="">-- Pilih --</option></select></div>
               <div class="col-md-4"><label class="form-label">Tenaga Kesehatan</label><select class="form-select" id="sel_nakes"><option value="">-- Pilih --</option></select></div>
               <div class="col-md-4"><label class="form-label">Asesor</label><select class="form-select" id="sel_asesor"></select></div>
@@ -373,8 +372,8 @@
       </div>
       <div class="table-responsive">
         <table class="table table-bordered table-hover align-middle">
-          <thead class="table-dark"><tr><th>Username</th><th>Nama</th><th>Peran/Jabatan</th><th>Tingkat</th><th>Unit</th><th>Aksi</th></tr></thead>
-          <tbody id="userTableBody"><tr><td colspan="6" class="text-center">Memuat data...</td></tr></tbody>
+          <thead class="table-dark"><tr><th>Username</th><th>Nama</th><th>Peran/Jabatan</th><th>Status</th><th>Tingkat</th><th>Unit</th><th>Aksi</th></tr></thead>
+          <tbody id="userTableBody"><tr><td colspan="7" class="text-center">Memuat data...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -530,6 +529,7 @@
           applyStrukturOrganisasiUI();
           loadKunci();
           document.getElementById('btnExport').classList.toggle('d-none', !isPimpinanUI());
+          document.getElementById('tabWilayahKerjaContainer').classList.toggle('d-none', !(userTingkat === 'UPT' && isPimpinanUI()));
           loadPenandatangan();
           loadLokasiAsesmen();
           loadDataList(); 
@@ -1000,28 +1000,28 @@
         asesor: document.getElementById('sel_asesor').value,
       };
       const opt = u => `<option value="${escHtml(u.username)}" data-nama="${escHtml(u.nama)}">${escHtml(u.nama)} (${escHtml(u.peran || '')})${u.upt_nama && u.upt_id !== (lokasiUptId || userUptId) ? ' - ' + escHtml(u.upt_nama) : ''}${u.has_ttd ? '' : ' - belum ada TTD'}</option>`;
-      ['sel_wali', 'sel_nakes'].forEach(id => {
-        document.getElementById(id).innerHTML = '<option value="">-- Pilih --</option>' + r.data.map(opt).join('');
-      });
-      document.getElementById('sel_asesor').innerHTML = (r.asesor || r.data).map(opt).join('');
+      const withStatus = (list, st) => list.filter(u => (u.status || []).includes(st) || (prev[st === 'asesor' ? 'asesor' : st] === u.username));
+      document.getElementById('sel_wali').innerHTML = '<option value="">-- Pilih --</option>' + withStatus(r.data, 'wali').map(opt).join('');
+      document.getElementById('sel_nakes').innerHTML = '<option value="">-- Pilih --</option>' + withStatus(r.data, 'nakes').map(opt).join('');
+      document.getElementById('sel_asesor').innerHTML = withStatus(r.asesor || r.data, 'asesor').map(opt).join('');
       document.getElementById('sel_wali').value = prev.wali || '';
       document.getElementById('sel_nakes').value = prev.nakes || '';
       document.getElementById('sel_asesor').value = prev.asesor || sessionUsername;
     });
   }
 
-  // Pilihan lokasi WBP: hanya tampil untuk user Bapas yang punya wilayah kerja.
+  // Dropdown UPT/Kanwil (lokasi WBP): UPT sendiri + wilayah kerja bila pemanggil di Bapas.
   function loadLokasiAsesmen() {
     if (userTingkat !== 'UPT') return;
     callApi('getLokasiAsesmen').then(r => {
       if (!r.success) return;
       lokasiInfo = r;
-      const wrap = document.getElementById('lokasiWrap');
-      const show = r.is_bapas && r.wilayah.length > 0;
-      wrap.classList.toggle('d-none', !show);
-      document.getElementById('sel_lokasi').innerHTML = show
-        ? [r.own].concat(r.wilayah).map(u => `<option value="${escHtml(u.id)}">${escHtml(u.nama)}${u.id === r.own.id ? ' (UPT saya)' : ''}</option>`).join('')
-        : '';
+      const sel = document.getElementById('id_upt');
+      if (sel.disabled) return;
+      const prev = sel.value;
+      sel.innerHTML = [r.own].concat(r.wilayah).filter(Boolean).map(u =>
+        `<option value="${escHtml(u.id)}" data-nama="${escHtml(u.nama)}">${escHtml(u.nama)}${u.id === r.own.id ? ' (UPT saya)' : ''}</option>`).join('');
+      if (prev && Array.from(sel.options).some(o => o.value === prev)) sel.value = prev;
     });
   }
 
@@ -1148,12 +1148,12 @@
     
     ['val_skorM4D','val_gt','val_kat','val_klaster','val_tpp'].forEach((tid, i) => document.getElementById(tid).value = d[i+101] || "");
     
-    const lokasiSel = document.getElementById('sel_lokasi');
-    if (d[112] && !Array.from(lokasiSel.options).some(o => o.value === d[112])) {
-      lokasiSel.innerHTML = `<option value="${escHtml(d[112])}">${escHtml(d[107] || d[112])}</option>`;
-    } else if (d[112]) lokasiSel.value = d[112];
-    lokasiSel.disabled = true;
-    document.getElementById('lokasiWrap').classList.toggle('d-none', !(lokasiInfo && lokasiInfo.is_bapas) && d[112] === userUptId);
+    const uptSel = document.getElementById('id_upt');
+    if (d[112] && !Array.from(uptSel.options).some(o => o.value === d[112])) {
+      uptSel.innerHTML = `<option value="${escHtml(d[112])}" data-nama="${escHtml(d[106] || '')}">${escHtml(d[106] || d[112])}</option>`;
+    }
+    if (d[112]) uptSel.value = d[112];
+    uptSel.disabled = true;
     loadPenandatangan(d[112] === userUptId ? null : d[112], { wali: d[108] || '', nakes: d[109] || '', asesor: d[111] || '' });
     calcTotal(); 
     
@@ -1166,7 +1166,7 @@
     activeEditNoreg = null;
     document.getElementById('editAlert').classList.add('d-none');
     document.getElementById('formAsesmen').reset();
-    document.getElementById('sel_lokasi').disabled = false;
+    document.getElementById('id_upt').disabled = false;
     loadLokasiAsesmen();
     loadPenandatangan(null, { wali: '', nakes: '', asesor: sessionUsername });
     let btn = document.getElementById('btnSimpan');
@@ -1196,7 +1196,10 @@
     
     const asesorSel = document.getElementById('sel_asesor');
     const asesorNama = asesorSel.selectedOptions[0] ? asesorSel.selectedOptions[0].dataset.nama : asr;
-    let arr = [ asesorNama || asr, document.getElementById('id_nama').value, document.getElementById('id_noreg').value, document.getElementById('id_upt').value, document.getElementById('id_ttl').value, document.getElementById('id_usia').value, document.getElementById('id_tglasesmen').value, document.getElementById('id_pasal').value, document.getElementById('id_lamapidana').value,
+    const uptSelEl = document.getElementById('id_upt');
+    if (!uptSelEl.value) { alert('Pilih UPT / Kanwil terlebih dahulu.'); btn.disabled = false; btn.innerText = activeEditNoreg ? "🔄 UPDATE DATA ASESMEN" : "💾 SIMPAN DATA BARU"; return; }
+    const uptNama = uptSelEl.selectedOptions[0].dataset.nama || uptSelEl.selectedOptions[0].text;
+    let arr = [ asesorNama || asr, document.getElementById('id_nama').value, document.getElementById('id_noreg').value, uptNama, document.getElementById('id_ttl').value, document.getElementById('id_usia').value, document.getElementById('id_tglasesmen').value, document.getElementById('id_pasal').value, document.getElementById('id_lamapidana').value,
       document.getElementById('m0_1').value, document.getElementById('m0_2').value, document.getElementById('m0_3').value, document.getElementById('m0_4').value, document.getElementById('m0_5').value, document.getElementById('m0_6').value, document.getElementById('m0_7').value, document.getElementById('m0_8').value, document.getElementById('m0_9').value, document.getElementById('m0_hasil').value,
       document.getElementById('m1_pasal').value, document.getElementById('m1_bb').value, document.getElementById('m1_peran').value, document.getElementById('m1_tat').value, document.getElementById('m1_urin').value, document.getElementById('m1_zat').value, document.getElementById('m1_usia').value, document.getElementById('m1_lama').value, document.getElementById('m1_frek').value, document.getElementById('m1_cara').value, document.getElementById('m1_terakhir').value, document.getElementById('m1_rehab').value, document.getElementById('m1_berhenti').value
     ];
@@ -1216,9 +1219,7 @@
     extra.wali = document.getElementById('sel_wali').value;
     extra.nakes = document.getElementById('sel_nakes').value;
     extra.asesor = asesorSel.value || sessionUsername;
-    if (!activeEditNoreg && !document.getElementById('lokasiWrap').classList.contains('d-none')) {
-      extra.lokasi_upt_id = document.getElementById('sel_lokasi').value;
-    }
+    if (!activeEditNoreg) extra.lokasi_upt_id = uptSelEl.value;
 
     callApi(actionName, extra).then(r => {
       alert(r.message); 
@@ -1282,6 +1283,7 @@
   // menentukan jenis form & aksi simpan yang dipanggil).
   // =========================================================================
   const JENIS_UPT_OPTIONS = ["Balai Pemasyarakatan", "Lembaga Pemasyarakatan", "Rumah Tahanan Negara", "Lembaga Pembinaan Khusus Anak"];
+  const STATUS_LABEL = { asesor: 'Asesor', wali: 'Wali', nakes: 'Tenaga Kesehatan' };
   let kanwilCache = [];
   let uptCache = [];
   let adminModalMode = null; // { type: 'kanwil' | 'upt' | 'user', id }
@@ -1383,16 +1385,16 @@
   // --- KELOLA USER ---
   function loadUserList() {
     let tbody = document.getElementById('userTableBody');
-    tbody.innerHTML = `<tr><td colspan="6" class="text-center">Memuat data...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center">Memuat data...</td></tr>`;
     Promise.all([callApi("listUsers"), userTingkat === 'UPT' ? Promise.resolve({ success: false }) : callApi("listUpt"), userTingkat === 'DITJEN' ? callApi("listKanwil") : Promise.resolve({ success: true, data: kanwilCache })])
     .then(([userRes, uptRes, kanwilRes]) => {
       if (uptRes.success) uptCache = uptRes.data || [];
       if (kanwilRes.success) kanwilCache = kanwilRes.data || [];
-      if (!userRes.success) { tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">${userRes.message}</td></tr>`; return; }
+      if (!userRes.success) { tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger">${userRes.message}</td></tr>`; return; }
       let users = userRes.data || [];
-      if (users.length === 0) { tbody.innerHTML = `<tr><td colspan="6" class="text-center">Belum ada data.</td></tr>`; return; }
+      if (users.length === 0) { tbody.innerHTML = `<tr><td colspan="7" class="text-center">Belum ada data.</td></tr>`; return; }
       tbody.innerHTML = users.map(u => `<tr>
-        <td>${esc(u.username)}</td><td>${esc(u.nama)}</td><td>${esc(u.peran)}</td><td>${esc(u.tingkat)}</td>
+        <td>${esc(u.username)}</td><td>${esc(u.nama)}</td><td>${esc(u.peran)}</td><td>${(u.status_penandatangan || []).map(x => `<span class="badge bg-info text-dark me-1">${STATUS_LABEL[x] || esc(x)}</span>`).join() || '-'}</td><td>${esc(u.tingkat)}</td>
         <td>${esc((u.upt && u.upt.nama) || (u.kanwil && u.kanwil.nama) || '-')}</td>
         <td>
           <button class="btn btn-sm btn-primary" onclick="openUserModal('${u.username}')">✏️ Edit</button>
@@ -1434,6 +1436,8 @@
         <input type="text" id="am_nama" class="form-control mb-2" value="${esc(u && u.nama)}">
         <label class="form-label">Peran/Jabatan</label>
         <input type="text" id="am_peran" class="form-control mb-2" value="${esc(u && u.peran)}">
+        <label class="form-label d-block">Status Penandatangan Asesmen</label>
+        <div class="mb-2">${Object.entries(STATUS_LABEL).map(([k, v]) => `<div class="form-check form-check-inline"><input class="form-check-input am-status" type="checkbox" id="am_st_${k}" value="${k}" ${u && (u.status_penandatangan || []).includes(k) ? 'checked' : ''}><label class="form-check-label" for="am_st_${k}">${v}</label></div>`).join('')}</div>
         <label class="form-label">Tingkat</label>
         <select id="am_tingkat" class="form-select mb-2" onchange="document.getElementById('am_unit_container').innerHTML = renderUnitFieldByTingkat(this.value, null, null)">
           ${tingkatOptions.map(t => `<option value="${t}" ${tingkatAwal === t ? 'selected' : ''}>${t}</option>`).join('')}
@@ -1503,6 +1507,7 @@
       let payload = {
         nama: document.getElementById('am_nama').value,
         peran: document.getElementById('am_peran').value,
+        status_penandatangan: Array.from(document.querySelectorAll('.am-status:checked')).map(c => c.value),
         tingkat: tingkat,
         upt_id: tingkat === 'UPT' ? (document.getElementById('am_upt_id') ? document.getElementById('am_upt_id').value : null) : null,
         kanwil_id: tingkat === 'KANWIL' ? (document.getElementById('am_kanwil_id') ? document.getElementById('am_kanwil_id').value : null) : null,
