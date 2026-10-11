@@ -672,17 +672,17 @@
       'm1_zat','m1_usia','m1_lama','m1_frek','m1_cara','m1_terakhir','m1_rehab','m1_berhenti'];
     textFields.forEach((tid, i) => document.getElementById(tid).value = d[i+2] || "");
     
-    for(let i=1; i<=11; i++) document.getElementById('m1_g'+i).checked = (d[i+31] === "Ya");
-    ['val_skorM1','m1_triangulasi','m1_redflag','m1_kategori','m2_td','m2_nadi','m2_suhu','m2_bb','m2_tb','m2_kesimpulan','m3_1','m3_2','m3_3','m3_4','m3_5','val_skorM3'].forEach((tid, i) => document.getElementById(tid).value = d[i+43] || "");
-    for(let i=1; i<=15; i++) document.getElementById('m4a_'+i).value = d[i+58] || "0";
-    ['m4a_pengalaman','m4a_kesediaan','val_skorM4A'].forEach((tid, i) => document.getElementById(tid).value = d[i+74] || "");
-    for(let i=1; i<=12; i++) document.getElementById('m4b_'+i).value = d[i+76] || "3";
-    ['val_skorM4B_mentah','val_skorM4B_konv'].forEach((tid, i) => document.getElementById(tid).value = d[i+89] || "");
+    for(let i=1; i<=11; i++) document.getElementById('m1_g'+i).checked = (d[i+32] === "Ya");
+    ['val_skorM1','m1_triangulasi','m1_redflag','m1_kategori','m2_td','m2_nadi','m2_suhu','m2_bb','m2_tb','m2_kesimpulan','m3_1','m3_2','m3_3','m3_4','m3_5','val_skorM3'].forEach((tid, i) => document.getElementById(tid).value = d[i+44] || "");
+    for(let i=1; i<=15; i++) document.getElementById('m4a_'+i).value = d[i+59] || "0";
+    ['m4a_pengalaman','m4a_kesediaan','val_skorM4A'].forEach((tid, i) => document.getElementById(tid).value = d[i+75] || "");
+    for(let i=1; i<=12; i++) document.getElementById('m4b_'+i).value = d[i+77] || "3";
+    ['val_skorM4B_mentah','val_skorM4B_konv'].forEach((tid, i) => document.getElementById(tid).value = d[i+90] || "");
     for(let i=1; i<=5; i++) document.getElementById('m4c_'+i).value = d[i+91] || "3";
-    document.getElementById('val_skorM4C').value = d[96] || "";
-    for(let i=1; i<=3; i++) document.getElementById('m4d_'+i).value = d[i+96] || "2";
+    document.getElementById('val_skorM4C').value = d[97] || "";
+    for(let i=1; i<=3; i++) document.getElementById('m4d_'+i).value = d[i+97] || "2";
     
-    ['val_skorM4D','val_gt','val_kat','val_klaster','val_tpp'].forEach((tid, i) => document.getElementById(tid).value = d[i+100] || "");
+    ['val_skorM4D','val_gt','val_kat','val_klaster','val_tpp'].forEach((tid, i) => document.getElementById(tid).value = d[i+101] || "");
     
     calcTotal(); 
     
