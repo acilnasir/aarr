@@ -1,0 +1,123 @@
+# Panduan Migrasi Backend: Google Apps Script -> Supabase
+
+Dokumen ini menjelaskan cara memindahkan backend aplikasi dari Google Apps
+Script + Google Sheets ke **Supabase** (Postgres + Edge Functions), dengan
+kode backend disimpan di repo ini (`supabase/`).
+
+## Arsitektur baru
+
+```
+index.html  --POST-->  Supabase Edge Function "api"  --service_role-->  Postgres (Supabase)
+                        (supabase/functions/api/index.ts)                (tabel users, hasil_asesmen)
+```
+
+- Edge Function `api` menggantikan `doPost()` di `Code.gs`, dengan action
+  yang sama persis: `login`, `save`, `read`, `update`, `delete`.
+- Tabel Postgres dilindungi Row Level Security tanpa policy sama sekali,
+  jadi **tidak bisa** diakses langsung lewat REST API publik (anon key).
+  Semua akses wajib lewat Edge Function yang memakai `service_role` key
+  di sisi server (tidak pernah dikirim ke browser).
+- Password disimpan sebagai **hash bcrypt**, bukan teks polos seperti di
+  Google Sheets sebelumnya.
+
+## Peringatan keamanan penting
+
+Di sheet "Users" saat ini, password = sama persis dengan username (NIP
+pegawai). Ini **sangat tidak aman** karena NIP adalah data yang mudah
+diketahui orang lain. Setelah migrasi, sangat disarankan:
+1. Meminta setiap user mengganti password masing-masing.
+2. Atau, siapkan password acak baru untuk tiap user saat proses import.
+
+Migrasi ini TIDAK mengubah mekanisme tersebut secara otomatis (supaya
+login tetap berfungsi seperti sebelumnya), hanya mengamankan penyimpanannya
+(hash, bukan plaintext).
+
+## Langkah 1 - Buat project Supabase
+
+1. Daftar/login di https://supabase.com, buat **New project**.
+2. Catat **Project URL** dan **Project Ref** (terlihat di Project Settings > API).
+3. Catat juga **anon public key** (untuk kebutuhan lain di masa depan jika diperlukan).
+
+## Langkah 2 - Install & login Supabase CLI (di komputer Anda)
+
+```bash
+npm install -g supabase
+supabase login
+```
+
+## Langkah 3 - Hubungkan repo ke project Supabase
+
+Dari root repo:
+
+```bash
+supabase link --project-ref <PROJECT_REF_ANDA>
+```
+
+Edit `supabase/config.toml`, ganti `GANTI_DENGAN_PROJECT_REF_ANDA` dengan
+project ref Anda.
+
+## Langkah 4 - Jalankan migrasi skema database
+
+```bash
+supabase db push
+```
+
+Ini membuat tabel `users` dan `hasil_asesmen` sesuai
+`supabase/migrations/0001_init.sql`.
+
+## Langkah 5 - Deploy Edge Function
+
+```bash
+supabase functions deploy api --no-verify-jwt
+```
+
+Setelah sukses, CLI menampilkan Function URL, formatnya kurang lebih:
+`https://<project-ref>.functions.supabase.co/api`
+
+## Langkah 6 - Export data lama dari Google Sheets
+
+Di Google Sheets:
+1. Buka sheet **Users** -> File > Download > Comma Separated Values (.csv)
+   -> simpan sebagai `supabase/import/data/users.csv`
+2. Buka sheet **Hasil_Asesmen** -> File > Download > Comma Separated Values
+   (.csv) -> simpan sebagai `supabase/import/data/hasil_asesmen.csv`
+
+Folder `supabase/import/data/` sudah di-`.gitignore`, file CSV ini **tidak**
+akan ter-commit ke GitHub (karena berisi data pribadi).
+
+## Langkah 7 - Jalankan skrip import
+
+```bash
+cd supabase/import
+npm install
+export SUPABASE_URL="https://<project-ref>.supabase.co"
+export SUPABASE_SERVICE_ROLE_KEY="<service_role_key_dari_Project_Settings_API>"
+npm run import
+```
+
+Skrip ini akan meng-hash semua password dengan bcrypt sebelum disimpan ke
+Supabase (lihat `supabase/import/import-data.mjs`).
+
+## Langkah 8 - Update frontend
+
+Di `index.html`, ganti baris:
+
+```js
+const API_URL = "https://xxxxxxxxxxxx.functions.supabase.co/api";
+```
+
+dengan Function URL dari Langkah 5.
+
+## Langkah 9 - Uji coba
+
+1. Jalankan aplikasi (`python3 -m http.server` atau sejenisnya).
+2. Coba login dengan salah satu akun yang sudah diimpor.
+3. Coba simpan, edit, hapus data asesmen, dan cek tombol
+   Buka/Kunci Aplikasi (muncul untuk user dengan peran "Kepala Bapas").
+
+## Rollback
+
+Selama Apps Script lama belum dimatikan, Anda bisa kembalikan
+`API_URL` ke URL `script.google.com/.../exec` yang lama kapan saja sebagai
+jalur mundur, tanpa kehilangan data (karena proses import tidak menghapus
+data asli di Google Sheets).
