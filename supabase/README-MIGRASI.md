@@ -200,3 +200,8 @@ tidak mendapat perubahan tampilan apapun.**
 - `getKunci` / `setKunci`: kunci disimpan di server dan diterapkan pada `save`/`update`/`delete`. Kepala Bapas mengunci UPT-nya, Kanwil seluruh UPT di provinsi, Ditjen seluruh UPT. Kunci tingkat atas mengalahkan pembukaan tingkat bawah.
 - Kepala Bapas (peran = "Kepala Bapas") dapat membuat/mengubah/menghapus user tingkat UPT pada UPT-nya sendiri.
 - Peran dibaca dari token (berlaku hingga 12 jam); perubahan peran baru berlaku setelah login ulang.
+
+## Ekspor & Laporan
+
+- `exportAsesmen`: seluruh hasil asesmen (sesuai lingkup) untuk pimpinan saja — Kepala Bapas (UPT), Kepala Kanwil, Dirjen/Admin Ditjen. Frontend mengunduh CSV (UTF-8, terbuka di Excel).
+- Tombol "Buat Laporan" (semua user): pratinjau PDF landscape dari data yang sedang difilter (skor, kategori, klaster, keputusan TPP).

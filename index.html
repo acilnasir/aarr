@@ -24,7 +24,7 @@
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Pratinjau Asesmen IKP-R</h5>
+        <h5 class="modal-title" id="pdfPreviewTitle">Pratinjau Asesmen IKP-R</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body p-0" id="pdfPreviewBody"><div id="pdfPaper"></div></div>
@@ -136,7 +136,7 @@
         <div class="col-md-2"><select class="form-select form-select-sm d-none" id="fltUpt" onchange="renderDataTable()"><option value="">Semua UPT</option></select></div>
         <div class="col-md-2"><select class="form-select form-select-sm" id="fltKategori" onchange="renderDataTable()"><option value="">Semua Kategori</option><option>LAYAK</option><option>LAYAK BERSYARAT</option><option>TIDAK LAYAK</option><option>DITUNDA</option></select></div>
         <div class="col-md-2"><select class="form-select form-select-sm" id="fltEdit" onchange="renderDataTable()"><option value="">Semua waktu edit</option><option value="1">Diedit 24 jam terakhir</option><option value="7">Diedit 7 hari terakhir</option><option value="30">Diedit 30 hari terakhir</option></select></div>
-        <div class="col-12 d-flex justify-content-between align-items-center"><small class="text-muted" id="dataCount"></small><button class="btn btn-sm btn-link" onclick="resetFilter()">Reset filter</button></div>
+        <div class="col-12 d-flex justify-content-between align-items-center"><small class="text-muted" id="dataCount"></small><div><button class="btn btn-sm btn-outline-primary me-1" onclick="buatLaporan()">📄 Buat Laporan</button><button class="btn btn-sm btn-outline-success me-1 d-none" id="btnExport" onclick="exportAsesmen()">⬇️ Ekspor Semua Data</button><button class="btn btn-sm btn-link" onclick="resetFilter()">Reset filter</button></div></div>
       </div>
       <div class="table-responsive">
         <table class="table table-bordered table-hover align-middle">
@@ -508,6 +508,7 @@
 
           applyStrukturOrganisasiUI();
           loadKunci();
+          document.getElementById('btnExport').classList.toggle('d-none', !isPimpinanUI());
           loadPenandatangan();
           loadDataList(); 
         }
@@ -637,6 +638,7 @@
   }
 
   let allRows = [];
+  let currentFilteredRows = [];
   let sortKey = 'updated', sortDir = -1;
 
   function loadDataList() {
@@ -687,6 +689,76 @@
     renderDataTable();
   }
 
+  function isPimpinanUI() {
+    const p = (userJabatan || '').trim().toLowerCase();
+    if (userTingkat === 'UPT') return p === 'kepala bapas';
+    if (userTingkat === 'KANWIL') return p.includes('kepala');
+    return /direktur|dirjen|admin/.test(p);
+  }
+
+  const EXPORT_HEADERS = (() => {
+    const h = ['Asesor', 'Nama', 'No. Register', 'UPT (input)', 'TTL', 'Usia', 'Tgl Asesmen', 'Pasal', 'Lama Pidana'];
+    for (let i = 1; i <= 9; i++) h.push('M0 item ' + i);
+    h.push('M0 Hasil');
+    ['Pasal', 'BB Narkotika', 'Peran', 'TAT', 'Urin', 'Zat', 'Usia Pertama', 'Lama Pakai', 'Frekuensi', 'Cara', 'Terakhir Pakai', 'Pernah Rehab', 'Berhenti'].forEach(x => h.push('M1 ' + x));
+    for (let i = 1; i <= 11; i++) h.push('M1 Gejala ' + i);
+    ['Skor M1', 'M1 Triangulasi', 'M1 Red Flag', 'M1 Kategori', 'M2 TD', 'M2 Nadi', 'M2 Suhu', 'M2 BB', 'M2 TB', 'M2 Kesimpulan', 'M3 item 1', 'M3 item 2', 'M3 item 3', 'M3 item 4', 'M3 item 5', 'Skor M3'].forEach(x => h.push(x));
+    for (let i = 1; i <= 15; i++) h.push('M4A item ' + i);
+    ['M4A Pengalaman', 'M4A Kesediaan', 'Skor M4A'].forEach(x => h.push(x));
+    for (let i = 1; i <= 12; i++) h.push('M4B item ' + i);
+    ['Skor M4B Mentah', 'Skor M4B Konversi'].forEach(x => h.push(x));
+    for (let i = 1; i <= 5; i++) h.push('M4C item ' + i);
+    h.push('Skor M4C');
+    for (let i = 1; i <= 3; i++) h.push('M4D item ' + i);
+    ['Skor M4D', 'Grand Total Skor', 'Kategori Rekomendasi', 'Rekomendasi Klaster', 'Keputusan Sidang TPP'].forEach(x => h.push(x));
+    return ['ID/Waktu Input'].concat(h, ['UPT', 'Kanwil', 'Wali', 'Nakes', 'Terakhir Diedit']);
+  })();
+
+  function exportAsesmen() {
+    const btn = document.getElementById('btnExport');
+    btn.disabled = true;
+    callApi('exportAsesmen').then(r => {
+      btn.disabled = false;
+      if (!r.success) return alert(r.message);
+      const q = v => '"' + String(v === null || v === undefined ? '' : v).replace(/"/g, '""') + '"';
+      const lines = [EXPORT_HEADERS.map(q).join(',')].concat((r.data || []).map(row => EXPORT_HEADERS.map((_, i) => q(row[i])).join(',')));
+      const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'Hasil_Asesmen_IKPR_' + new Date().toISOString().slice(0, 10) + '.csv';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    }).catch(e => { btn.disabled = false; alert('Gagal ekspor: ' + e); });
+  }
+
+  function buatLaporan() {
+    const rows = currentFilteredRows;
+    if (!rows.length) return alert('Tidak ada data untuk dilaporkan.');
+    const showUpt = userTingkat !== 'UPT';
+    const tgl = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+    const th = t => `<th style="border:1px solid #000;padding:4px;background:#e9ecef;">${t}</th>`;
+    const td = (t, a) => `<td style="border:1px solid #000;padding:4px;${a ? 'text-align:' + a + ';' : ''}">${escHtml(t)}</td>`;
+    const skor = rows.map(r => parseFloat(r[102])).filter(x => !isNaN(x));
+    const rata = skor.length ? (skor.reduce((a, b) => a + b, 0) / skor.length).toFixed(1) : '-';
+    const cnt = {}; rows.forEach(r => { cnt[r[103] || '-'] = (cnt[r[103] || '-'] || 0) + 1; });
+    const ringkas = Object.entries(cnt).map(([k, v]) => `${escHtml(k)}: <b>${v}</b>`).join(' &nbsp;|&nbsp; ');
+    const lingkup = { UPT: rows[0][106] || 'Unit Pelaksana Teknis', KANWIL: 'Kantor Wilayah', DITJEN: 'Direktorat Jenderal Pemasyarakatan' }[userTingkat];
+    document.getElementById('pdfPaper').innerHTML = `
+      <div style="padding:10px;font-family:Arial,sans-serif;font-size:11px;color:#000;background:#fff;">
+        <h3 style="text-align:center;margin:0;">LAPORAN HASIL ASESMEN IKP-R</h3>
+        <div style="text-align:center;margin-bottom:10px;">${escHtml(lingkup)} &mdash; per ${tgl}</div>
+        <p>Jumlah klien: <b>${rows.length}</b> &nbsp;|&nbsp; Rata-rata skor: <b>${rata}</b><br>Kategori rekomendasi &mdash; ${ringkas}</p>
+        <table width="100%" style="border-collapse:collapse;">
+          <thead><tr>${th('No')}${th('Nama Klien')}${th('No. Register')}${showUpt ? th('UPT') : ''}${th('Skor')}${th('Kategori Rekomendasi')}${th('Rekomendasi Klaster')}${th('Keputusan Sidang TPP')}</tr></thead>
+          <tbody>${rows.map((r, i) => `<tr>${td(i + 1, 'center')}${td(r[2])}${td(r[3])}${showUpt ? td(r[106]) : ''}${td(r[102], 'center')}${td(r[103])}${td(r[104])}${td(r[105])}</tr>`).join('')}</tbody>
+        </table>
+      </div>`;
+    currentPdfFilename = 'Laporan_Asesmen_IKPR_' + new Date().toISOString().slice(0, 10) + '.pdf';
+    currentPdfOrientation = 'landscape';
+    document.getElementById('pdfPreviewTitle').innerText = 'Pratinjau Laporan Asesmen';
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('pdfPreviewModal')).show();
+  }
+
   function resetFilter() {
     ['fltSearch', 'fltAsesor', 'fltUpt', 'fltKategori', 'fltEdit'].forEach(id => document.getElementById(id).value = '');
     renderDataTable();
@@ -706,6 +778,7 @@
       if (q && ![r[1], r[2], r[3], r[4], r[106], r[107], r[0]].join(' ').toLowerCase().includes(q)) return false;
       return true;
     });
+    currentFilteredRows = rows;
     const g = sortGetters[sortKey];
     rows.sort((x, y) => { const a = g(x), b = g(y); return (a < b ? -1 : a > b ? 1 : 0) * sortDir; });
 
@@ -857,6 +930,8 @@
     `;
 
     currentPdfFilename = 'Asesmen_IKPR_' + d[3] + '_' + d[2] + '.pdf';
+    currentPdfOrientation = 'portrait';
+    document.getElementById('pdfPreviewTitle').innerText = 'Pratinjau Asesmen IKP-R';
     document.getElementById('pdfPaper').innerHTML = html;
     document.getElementById('pengesahanSlot').innerHTML = buildPengesahanHtml(null, d);
     bootstrap.Modal.getOrCreateInstance(document.getElementById('pdfPreviewModal')).show();
@@ -952,6 +1027,7 @@
   }
 
   let currentPdfFilename = 'Asesmen_IKPR.pdf';
+  let currentPdfOrientation = 'portrait';
 
   function downloadPreviewPdf() {
     const btn = document.getElementById('btnDownloadPdf');
@@ -963,7 +1039,7 @@
       filename:     currentPdfFilename,
       image:        { type: 'jpeg', quality: 0.98 },
       html2canvas:  { scale: 2, useCORS: true, scrollX: 0, scrollY: 0, backgroundColor: '#ffffff' },
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: currentPdfOrientation },
       pagebreak:    { mode: ['css', 'legacy'], avoid: 'tr' }
     };
     html2pdf().set(opt).from(document.getElementById('pdfPaper')).save()
@@ -977,7 +1053,7 @@
     document.body.appendChild(iframe);
     const doc = iframe.contentWindow.document;
     doc.open();
-    doc.write('<html><head><title>' + currentPdfFilename.replace('.pdf', '') + '</title><style>@page{size:A4;margin:10mm;} body{margin:0;} .html2pdf__page-break{page-break-after:always;} tr{page-break-inside:avoid;}</style></head><body>' + document.getElementById('pdfPaper').innerHTML + '</body></html>');
+    doc.write('<html><head><title>' + currentPdfFilename.replace('.pdf', '') + '</title><style>@page{size:A4 ' + currentPdfOrientation + ';margin:10mm;} body{margin:0;} .html2pdf__page-break{page-break-after:always;} tr{page-break-inside:avoid;}</style></head><body>' + document.getElementById('pdfPaper').innerHTML + '</body></html>');
     doc.close();
     let printed = false;
     const go = () => { if (printed) return; printed = true; iframe.contentWindow.focus(); iframe.contentWindow.print(); setTimeout(() => iframe.remove(), 2000); };

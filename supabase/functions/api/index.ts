@@ -144,6 +144,11 @@ serve(async (req: Request) => {
       case "read":
         result = await readDataAsesmen(session);
         break;
+      case "exportAsesmen":
+        result = isPimpinan(session)
+          ? await readDataAsesmen(session)
+          : forbidden("Hanya pimpinan yang dapat mengekspor data.");
+        break;
       case "update":
         result = await updateDataAsesmen(session, body.id, body.payload, body.wali, body.nakes);
         break;
@@ -593,6 +598,14 @@ async function getPengesahan(session: SessionPayload, idNoreg: string) {
 //   Kepala Bapas -> mengunci UPT-nya; Kanwil -> seluruh UPT di provinsinya;
 //   Ditjen -> seluruh UPT nasional. Kunci terkuat dari atas yang berlaku.
 // ---------------------------------------------------------------------------
+// Pimpinan tertinggi per tingkat: Kepala Bapas (UPT), Kepala Kanwil, Dirjen/admin Ditjen.
+function isPimpinan(session: SessionPayload): boolean {
+  const peran = (session.peran ?? "").trim().toLowerCase();
+  if (session.tingkat === "UPT") return peran === "kepala bapas";
+  if (session.tingkat === "KANWIL") return peran.includes("kepala");
+  return /direktur|dirjen|admin/.test(peran);
+}
+
 function isKepalaBapas(session: SessionPayload): boolean {
   return session.tingkat === "UPT" && (session.peran ?? "").trim().toLowerCase() === "kepala bapas";
 }
