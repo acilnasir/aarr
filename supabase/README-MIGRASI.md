@@ -173,6 +173,17 @@ supabase secrets set APP_SESSION_SECRET=<nilai_acak_panjang>
 `listUsers`, `createUser`, `updateUser`, `deleteUser`,
 `changePassword`.
 
+### Tanda tangan pengesahan (migrasi `0003_tanda_tangan.sql`)
+
+Setiap user dapat mengunggah gambar tanda tangan (tombol "Tanda Tangan
+Saya"). Pada form asesmen, asesor memilih Wali Pemasyarakatan dan Tenaga
+Kesehatan dari user di UPT-nya. Saat cetak PDF, blok pengesahan menampilkan
+tiga tanda tangan di atas nama masing-masing. Action: `getMySignature`,
+`saveMySignature`, `listPenandatangan`, `getPengesahan`. Kolom baru:
+`users.tanda_tangan`, `hasil_asesmen.asesor_username/wali_username/nakes_username`.
+Baris `read` kini memiliki 110 kolom (`[108]` wali, `[109]` nakes).
+Data lama: asesor dicocokkan lewat nama; wali/nakes kosong sampai data diedit.
+
 ### UI baru
 
 User tingkat KANWIL/DITJEN mendapat tab tambahan (Kelola Wilayah -
