@@ -180,7 +180,7 @@
             <div class="row g-2">
               <div class="col-md-3"><label class="form-label">Nama</label><input type="text" class="form-control" id="id_nama"></div>
               <div class="col-md-3"><label class="form-label">No. Register</label><input type="text" class="form-control" id="id_noreg"></div>
-              <div class="col-md-3"><label class="form-label">UPT / Kanwil</label><input type="text" class="form-control" id="id_upt"></div>
+              <div class="col-md-3"><label class="form-label">UPT / Kanwil</label><select class="form-select" id="id_upt" required onchange="loadPenandatangan(this.value)"></select></div>
               <div class="col-md-3"><label class="form-label">Tempat, Tgl Lahir</label><input type="text" class="form-control" id="id_ttl"></div>
               <div class="col-md-2"><label class="form-label">Usia</label><input type="number" class="form-control" id="id_usia"></div>
               <div class="col-md-3"><label class="form-label">Tgl Asesmen</label><input type="date" class="form-control" id="id_tglasesmen"></div>
@@ -308,7 +308,6 @@
             
             <h6 class="mt-4 fw-bold">Penandatangan Pengesahan</h6>
             <div class="row g-3">
-              <div class="col-md-12 d-none" id="lokasiWrap"><label class="form-label">Lokasi WBP (UPT tempat warga binaan berada)</label><select class="form-select" id="sel_lokasi" onchange="loadPenandatangan(this.value)"></select></div>
               <div class="col-md-4"><label class="form-label">Wali Pemasyarakatan</label><select class="form-select" id="sel_wali"><option value="">-- Pilih --</option></select></div>
               <div class="col-md-4"><label class="form-label">Tenaga Kesehatan</label><select class="form-select" id="sel_nakes"><option value="">-- Pilih --</option></select></div>
               <div class="col-md-4"><label class="form-label">Asesor</label><select class="form-select" id="sel_asesor"></select></div>
@@ -1010,18 +1009,18 @@
     });
   }
 
-  // Pilihan lokasi WBP: hanya tampil untuk user Bapas yang punya wilayah kerja.
+  // Dropdown UPT/Kanwil (lokasi WBP): UPT sendiri + wilayah kerja bila pemanggil di Bapas.
   function loadLokasiAsesmen() {
     if (userTingkat !== 'UPT') return;
     callApi('getLokasiAsesmen').then(r => {
       if (!r.success) return;
       lokasiInfo = r;
-      const wrap = document.getElementById('lokasiWrap');
-      const show = r.is_bapas && r.wilayah.length > 0;
-      wrap.classList.toggle('d-none', !show);
-      document.getElementById('sel_lokasi').innerHTML = show
-        ? [r.own].concat(r.wilayah).map(u => `<option value="${escHtml(u.id)}">${escHtml(u.nama)}${u.id === r.own.id ? ' (UPT saya)' : ''}</option>`).join('')
-        : '';
+      const sel = document.getElementById('id_upt');
+      if (sel.disabled) return;
+      const prev = sel.value;
+      sel.innerHTML = [r.own].concat(r.wilayah).filter(Boolean).map(u =>
+        `<option value="${escHtml(u.id)}" data-nama="${escHtml(u.nama)}">${escHtml(u.nama)}${u.id === r.own.id ? ' (UPT saya)' : ''}</option>`).join('');
+      if (prev && Array.from(sel.options).some(o => o.value === prev)) sel.value = prev;
     });
   }
 
@@ -1148,12 +1147,12 @@
     
     ['val_skorM4D','val_gt','val_kat','val_klaster','val_tpp'].forEach((tid, i) => document.getElementById(tid).value = d[i+101] || "");
     
-    const lokasiSel = document.getElementById('sel_lokasi');
-    if (d[112] && !Array.from(lokasiSel.options).some(o => o.value === d[112])) {
-      lokasiSel.innerHTML = `<option value="${escHtml(d[112])}">${escHtml(d[107] || d[112])}</option>`;
-    } else if (d[112]) lokasiSel.value = d[112];
-    lokasiSel.disabled = true;
-    document.getElementById('lokasiWrap').classList.toggle('d-none', !(lokasiInfo && lokasiInfo.is_bapas) && d[112] === userUptId);
+    const uptSel = document.getElementById('id_upt');
+    if (d[112] && !Array.from(uptSel.options).some(o => o.value === d[112])) {
+      uptSel.innerHTML = `<option value="${escHtml(d[112])}" data-nama="${escHtml(d[106] || '')}">${escHtml(d[106] || d[112])}</option>`;
+    }
+    if (d[112]) uptSel.value = d[112];
+    uptSel.disabled = true;
     loadPenandatangan(d[112] === userUptId ? null : d[112], { wali: d[108] || '', nakes: d[109] || '', asesor: d[111] || '' });
     calcTotal(); 
     
@@ -1166,7 +1165,7 @@
     activeEditNoreg = null;
     document.getElementById('editAlert').classList.add('d-none');
     document.getElementById('formAsesmen').reset();
-    document.getElementById('sel_lokasi').disabled = false;
+    document.getElementById('id_upt').disabled = false;
     loadLokasiAsesmen();
     loadPenandatangan(null, { wali: '', nakes: '', asesor: sessionUsername });
     let btn = document.getElementById('btnSimpan');
@@ -1196,7 +1195,10 @@
     
     const asesorSel = document.getElementById('sel_asesor');
     const asesorNama = asesorSel.selectedOptions[0] ? asesorSel.selectedOptions[0].dataset.nama : asr;
-    let arr = [ asesorNama || asr, document.getElementById('id_nama').value, document.getElementById('id_noreg').value, document.getElementById('id_upt').value, document.getElementById('id_ttl').value, document.getElementById('id_usia').value, document.getElementById('id_tglasesmen').value, document.getElementById('id_pasal').value, document.getElementById('id_lamapidana').value,
+    const uptSelEl = document.getElementById('id_upt');
+    if (!uptSelEl.value) { alert('Pilih UPT / Kanwil terlebih dahulu.'); btn.disabled = false; btn.innerText = activeEditNoreg ? "🔄 UPDATE DATA ASESMEN" : "💾 SIMPAN DATA BARU"; return; }
+    const uptNama = uptSelEl.selectedOptions[0].dataset.nama || uptSelEl.selectedOptions[0].text;
+    let arr = [ asesorNama || asr, document.getElementById('id_nama').value, document.getElementById('id_noreg').value, uptNama, document.getElementById('id_ttl').value, document.getElementById('id_usia').value, document.getElementById('id_tglasesmen').value, document.getElementById('id_pasal').value, document.getElementById('id_lamapidana').value,
       document.getElementById('m0_1').value, document.getElementById('m0_2').value, document.getElementById('m0_3').value, document.getElementById('m0_4').value, document.getElementById('m0_5').value, document.getElementById('m0_6').value, document.getElementById('m0_7').value, document.getElementById('m0_8').value, document.getElementById('m0_9').value, document.getElementById('m0_hasil').value,
       document.getElementById('m1_pasal').value, document.getElementById('m1_bb').value, document.getElementById('m1_peran').value, document.getElementById('m1_tat').value, document.getElementById('m1_urin').value, document.getElementById('m1_zat').value, document.getElementById('m1_usia').value, document.getElementById('m1_lama').value, document.getElementById('m1_frek').value, document.getElementById('m1_cara').value, document.getElementById('m1_terakhir').value, document.getElementById('m1_rehab').value, document.getElementById('m1_berhenti').value
     ];
@@ -1216,9 +1218,7 @@
     extra.wali = document.getElementById('sel_wali').value;
     extra.nakes = document.getElementById('sel_nakes').value;
     extra.asesor = asesorSel.value || sessionUsername;
-    if (!activeEditNoreg && !document.getElementById('lokasiWrap').classList.contains('d-none')) {
-      extra.lokasi_upt_id = document.getElementById('sel_lokasi').value;
-    }
+    if (!activeEditNoreg) extra.lokasi_upt_id = uptSelEl.value;
 
     callApi(actionName, extra).then(r => {
       alert(r.message); 
