@@ -2,7 +2,10 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Aplikasi Asesmen Narapidana - IKP-R CRUD & Cetak PDF Full</title>
+  <title>STAR-PK - Fitur Asesmen Rehabilitasi dan Reedukasi</title>
+  <link rel="icon" href="logo-starpk.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -10,11 +13,32 @@
 
   <style>
     .form-label { font-weight: 600; font-size: 0.9rem; margin-top: 10px; }
-    .section-title { background: #0D3B66; color: white; padding: 8px 15px; border-radius: 4px; margin-top: 25px; }
+    .section-title { background: #0E203C; color: white; padding: 8px 15px; border-radius: 4px; margin-top: 25px; }
     .table-radio td { text-align: center; vertical-align: middle; }
     .table-radio th { font-size: 0.9rem; }
     #pdfPreviewBody { background: #6c757d; padding: 16px; overflow: auto; }
     #pdfPaper { background: #fff; width: 760px; max-width: 100%; margin: 0 auto; box-shadow: 0 0 8px rgba(0,0,0,.5); }
+
+    :root { --star-navy:#0E203C; --star-navy2:#1F3A5B; --star-gold:#F5B800; --bs-primary:#0E203C; --bs-primary-rgb:14,32,60; --bs-link-color:#0E203C; --bs-link-color-rgb:14,32,60; --bs-link-hover-color:#1F3A5B; --bs-body-font-family:'Outfit',sans-serif; --bs-body-bg:#F7F7F9; --bs-border-radius:4px; }
+    body { font-family:'Outfit',sans-serif; background:#F7F7F9 !important; color:#212529; }
+    .btn-primary { --bs-btn-bg:#0E203C; --bs-btn-border-color:#0E203C; --bs-btn-hover-bg:#1F3A5B; --bs-btn-hover-border-color:#1F3A5B; --bs-btn-active-bg:#1F3A5B; --bs-btn-active-border-color:#1F3A5B; --bs-btn-disabled-bg:#0E203C; --bs-btn-disabled-border-color:#0E203C; }
+    .btn-outline-primary { --bs-btn-color:#0E203C; --bs-btn-border-color:#0E203C; --bs-btn-hover-bg:#0E203C; --bs-btn-hover-border-color:#0E203C; --bs-btn-active-bg:#0E203C; --bs-btn-active-border-color:#0E203C; }
+    .btn-info { --bs-btn-color:#0E203C; --bs-btn-bg:#F5B800; --bs-btn-border-color:#F5B800; --bs-btn-hover-color:#0E203C; --bs-btn-hover-bg:#FFCB2E; --bs-btn-hover-border-color:#FFCB2E; --bs-btn-active-bg:#E0A800; --bs-btn-active-border-color:#E0A800; --bs-btn-active-color:#0E203C; }
+    .btn-info.text-white { color:#0E203C !important; }
+    .table-dark { --bs-table-bg:#0E203C; --bs-table-border-color:#1F3A5B; --bs-table-striped-bg:#1F3A5B; }
+    .card { border-color:#E4E6EB; border-radius:6px; }
+    .form-control:focus, .form-select:focus { border-color:#1F3A5B; box-shadow:0 0 0 .2rem rgba(14,32,60,.15); }
+    .star-header { border-bottom:3px solid #F5B800; }
+    .nav-tabs { border-bottom:1px solid #D9DCE3; }
+    .nav-tabs .nav-link { color:#0E203C !important; border:0; border-bottom:3px solid transparent; border-radius:0; background:transparent; }
+    .nav-tabs .nav-link:hover { border-bottom-color:#D9DCE3; }
+    .nav-tabs .nav-link.active { color:#0E203C !important; background:#fff; border-bottom-color:#F5B800; }
+    .star-login { min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px 16px 64px; position:relative;
+      background: radial-gradient(rgba(255,255,255,.07) 2px, transparent 2px) 0 0/28px 28px, linear-gradient(45deg, #1F3A5B 50%, #0E203C); }
+    .star-login-card { background:#fff; border-radius:6px; width:100%; max-width:440px; padding:36px 40px; box-shadow:0 10px 40px rgba(0,0,0,.35); }
+    .star-title { font-weight:600; color:#0E203C; }
+    .star-sub { color:#0E203C; font-weight:500; font-size:.95rem; }
+    .star-footer { position:absolute; bottom:24px; left:0; right:0; text-align:center; color:rgba(255,255,255,.55); font-size:.9rem; }
   </style>
 </head>
 <body class="bg-light">
@@ -24,7 +48,7 @@
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="pdfPreviewTitle">Pratinjau Asesmen IKP-R</h5>
+        <h5 class="modal-title" id="pdfPreviewTitle">Pratinjau Asesmen STAR-PK</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body p-0" id="pdfPreviewBody"><div id="pdfPaper"></div></div>
@@ -38,31 +62,33 @@
 </div>
 
 <!-- DIV LOGIN -->
-<div class="container py-5" id="loginSection" style="max-width: 400px;">
-  <div class="text-center mb-3">
-    <img src="logo-kemenimipas.png" alt="Logo Kemenimipas" style="height: 90px;">
-    <h5 class="mt-2 mb-0 text-primary fw-bold">Aplikasi Asesmen Narapidana</h5>
-    <small class="text-muted">IKP-R CRUD &amp; Cetak PDF Full</small>
-  </div>
-  <div class="card shadow">
-    <div class="card-header bg-primary text-white text-center d-flex align-items-center justify-content-center gap-2">
-      <img src="logo-kemenimipas.png" alt="Logo Kemenimipas" style="height: 28px;">
-      <h5 class="mb-0">Login Asesor</h5>
+<div id="loginSection" class="star-login">
+  <div class="star-login-card">
+    <div class="text-center mb-4">
+      <img src="logo-starpk.png" alt="STAR-PK" style="max-width: 280px; width: 100%;">
+      <div class="star-sub mt-2">Fitur Asesmen Rehabilitasi dan Reedukasi</div>
     </div>
-    <div class="card-body">
-      <form id="formLogin">
-        <input type="text" id="username" class="form-control mb-2" placeholder="Username" required>
-        <input type="password" id="password" class="form-control mb-3" placeholder="Password" required>
-        <button type="button" class="btn btn-primary w-100" onclick="doLogin()">Masuk</button>
-      </form>
-    </div>
+    <h4 class="star-title">Selamat Datang !</h4>
+    <p class="text-muted mb-4">Silakan login untuk melanjutkan</p>
+    <form id="formLogin" onsubmit="doLogin(); return false;">
+      <label class="form-label" for="username">Username</label>
+      <input type="text" id="username" class="form-control form-control-lg mb-3" placeholder="Masukkan Username" required>
+      <label class="form-label" for="password">Password</label>
+      <input type="password" id="password" class="form-control form-control-lg mb-4" placeholder="Masukkan Password" required>
+      <button type="submit" class="btn btn-primary btn-lg w-100">Login</button>
+    </form>
+    <div class="text-center mt-4"><img src="logo-kemenimipas.png" alt="Logo Kemenimipas" style="height: 56px;"></div>
   </div>
+  <div class="star-footer">&copy; 2026 STAR-PK. Kementerian Imigrasi dan Pemasyarakatan</div>
 </div>
 
 <!-- DIV APLIKASI UTAMA -->
 <div class="container-fluid py-3 px-4" id="appSection" style="display:none;">
-  <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
-    <h4>Sistem Asesmen IKP-R</h4>
+  <div class="d-flex justify-content-between align-items-center mb-3 pb-2 star-header">
+    <div class="d-flex align-items-center gap-3">
+      <img src="logo-starpk.png" alt="STAR-PK" style="height: 46px;">
+      <div class="border-start ps-3 lh-sm d-none d-md-block"><div class="fw-bold" style="color:#0E203C;">Fitur Asesmen Rehabilitasi dan Reedukasi</div><small class="text-muted">Kementerian Imigrasi dan Pemasyarakatan</small></div>
+    </div>
     <div>
       <span id="userInfo" class="badge bg-secondary me-2"></span>
       <button id="btnTtdSaya" class="btn btn-sm btn-outline-primary me-2" onclick="openTtdModal()">✍️ Tanda Tangan Saya</button>
@@ -136,6 +162,7 @@
       <div class="row g-2 mb-3">
         <div class="col-md-4"><input type="search" class="form-control form-control-sm" id="fltSearch" placeholder="🔍 Cari nama, no. register, asesor, UPT..." oninput="renderDataTable()"></div>
         <div class="col-md-2"><select class="form-select form-select-sm" id="fltAsesor" onchange="renderDataTable()"><option value="">Semua Asesor</option></select></div>
+        <div class="col-md-2"><select class="form-select form-select-sm d-none" id="fltKanwil" onchange="fillFilterOptions(); renderDataTable()"><option value="">Semua Kanwil</option></select></div>
         <div class="col-md-2"><select class="form-select form-select-sm d-none" id="fltUpt" onchange="renderDataTable()"><option value="">Semua UPT</option></select></div>
         <div class="col-md-2"><select class="form-select form-select-sm" id="fltKategori" onchange="renderDataTable()"><option value="">Semua Kategori</option><option>LAYAK</option><option>LAYAK BERSYARAT</option><option>TIDAK LAYAK</option><option>DITUNDA</option></select></div>
         <div class="col-md-2"><select class="form-select form-select-sm" id="fltEdit" onchange="renderDataTable()"><option value="">Semua waktu edit</option><option value="1">Diedit 24 jam terakhir</option><option value="7">Diedit 7 hari terakhir</option><option value="30">Diedit 30 hari terakhir</option></select></div>
@@ -706,15 +733,18 @@
   }
 
   function fillFilterOptions() {
-    const fill = (id, idx, label) => {
+    const kw = document.getElementById('fltKanwil').value;
+    const fill = (id, idx, label, rows = allRows) => {
       const el = document.getElementById(id), cur = el.value;
-      const vals = [...new Set(allRows.map(r => r[idx]).filter(Boolean))].sort();
+      const vals = [...new Set(rows.map(r => r[idx]).filter(Boolean))].sort();
       el.innerHTML = `<option value="">${label}</option>` + vals.map(v => `<option>${escHtml(v)}</option>`).join('');
       el.value = vals.includes(cur) ? cur : '';
     };
     fill('fltAsesor', 1, 'Semua Asesor');
-    fill('fltUpt', 4, 'Semua UPT');
+    fill('fltKanwil', 107, 'Semua Kanwil');
+    fill('fltUpt', 4, 'Semua UPT', kw ? allRows.filter(r => r[107] === kw) : allRows);
     document.getElementById('fltUpt').classList.toggle('d-none', userTingkat === 'UPT');
+    document.getElementById('fltKanwil').classList.toggle('d-none', userTingkat !== 'DITJEN');
   }
 
   function setSort(key) {
@@ -793,7 +823,8 @@
   }
 
   function resetFilter() {
-    ['fltSearch', 'fltAsesor', 'fltUpt', 'fltKategori', 'fltEdit'].forEach(id => document.getElementById(id).value = '');
+    ['fltSearch', 'fltAsesor', 'fltKanwil', 'fltUpt', 'fltKategori', 'fltEdit'].forEach(id => document.getElementById(id).value = '');
+    fillFilterOptions();
     renderDataTable();
   }
 
@@ -844,7 +875,7 @@
       currentBatch = rows;
       currentPdfFilename = `Asesmen_IKPR_${awal}_sd_${akhir}.pdf`;
       currentPdfOrientation = 'portrait';
-      document.getElementById('pdfPreviewTitle').innerText = `Pratinjau ${rows.length} Asesmen IKP-R (${awal} s/d ${akhir}) - diunduh 1 data 1 file`;
+      document.getElementById('pdfPreviewTitle').innerText = `Pratinjau ${rows.length} Asesmen STAR-PK (${awal} s/d ${akhir}) - diunduh 1 data 1 file`;
       document.getElementById('pdfPaper').innerHTML = items.join('<div class="html2pdf__page-break"></div>');
       bootstrap.Modal.getOrCreateInstance(document.getElementById('pdfPreviewModal')).show();
     } finally {
@@ -879,7 +910,7 @@
 
   function renderDataTable() {
     const q = document.getElementById('fltSearch').value.trim().toLowerCase();
-    const fa = document.getElementById('fltAsesor').value, fu = document.getElementById('fltUpt').value;
+    const fa = document.getElementById('fltAsesor').value, fu = document.getElementById('fltUpt').value, fkw = document.getElementById('fltKanwil').value;
     const fk = document.getElementById('fltKategori').value, fe = document.getElementById('fltEdit').value;
     const cutoff = fe ? Date.now() - parseInt(fe) * 86400000 : 0;
     const canBatch = userTingkat === 'UPT' && isPimpinanUI();
@@ -890,6 +921,7 @@
     let rows = allRows.filter(r => {
       if (fa && r[1] !== fa) return false;
       if (fu && r[4] !== fu) return false;
+      if (fkw && r[107] !== fkw) return false;
       if (fk && r[103] !== fk) return false;
       if (cutoff && !(new Date(r[110]).getTime() >= cutoff)) return false;
       if (bAwal && String(r[7] || '') < bAwal) return false;
@@ -1058,7 +1090,7 @@
 
     currentPdfFilename = 'Asesmen_IKPR_' + d[3] + '_' + d[2] + '.pdf';
     currentPdfOrientation = 'portrait';
-    document.getElementById('pdfPreviewTitle').innerText = 'Pratinjau Asesmen IKP-R';
+    document.getElementById('pdfPreviewTitle').innerText = 'Pratinjau Asesmen STAR-PK';
     document.getElementById('pdfPaper').innerHTML = html;
     document.getElementById('pengesahanSlot').innerHTML = buildPengesahanHtml(null, d);
     bootstrap.Modal.getOrCreateInstance(document.getElementById('pdfPreviewModal')).show();
