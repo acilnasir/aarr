@@ -842,9 +842,9 @@
       };
       await Promise.all([kerja(), kerja(), kerja(), kerja()]);
       currentBatch = rows;
-      currentPdfFilename = `Asesmen_IKPR_${awal}_sd_${akhir}_${rows.length}data.pdf`;
+      currentPdfFilename = `Asesmen_IKPR_${awal}_sd_${akhir}.pdf`;
       currentPdfOrientation = 'portrait';
-      document.getElementById('pdfPreviewTitle').innerText = `Pratinjau ${rows.length} Asesmen IKP-R (${awal} s/d ${akhir})`;
+      document.getElementById('pdfPreviewTitle').innerText = `Pratinjau ${rows.length} Asesmen IKP-R (${awal} s/d ${akhir}) - diunduh 1 data 1 file`;
       document.getElementById('pdfPaper').innerHTML = items.join('<div class="html2pdf__page-break"></div>');
       bootstrap.Modal.getOrCreateInstance(document.getElementById('pdfPreviewModal')).show();
     } finally {
@@ -852,26 +852,26 @@
     }
   }
 
-  // Satu PDF gabungan; tiap data dirender satu per satu agar kanvas tidak melebihi batas browser.
+  // Satu data = satu file PDF; dirender dan diunduh berurutan agar kanvas tidak melebihi batas browser.
   async function downloadBatchPdf() {
     const btn = document.getElementById('btnDownloadPdf');
     const items = Array.from(document.querySelectorAll('#pdfPaper .batch-item'));
-    const base = { margin: 10, image: { type: 'jpeg', quality: 0.85 },
-      html2canvas: { scale: 1.5, useCORS: true, scrollX: 0, scrollY: 0, backgroundColor: '#ffffff' },
+    const base = { margin: 10, image: { type: 'jpeg', quality: 0.95 },
+      html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0, backgroundColor: '#ffffff' },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }, pagebreak: { mode: ['css', 'legacy'], avoid: 'tr' } };
     btn.disabled = true;
+    let ok = 0;
     try {
-      let pdf = null;
       for (let i = 0; i < items.length; i++) {
-        btn.innerText = `Membuat PDF ${i + 1}/${items.length}...`;
-        const w = html2pdf().set(base).from(items[i]);
-        if (pdf) { w.prop.pdf = pdf; pdf.addPage(); }
-        await w.toPdf();
-        pdf = w.prop.pdf;
+        btn.innerText = `Mengunduh PDF ${i + 1}/${items.length}...`;
+        const d = currentBatch[i];
+        const filename = `Asesmen_IKPR_${d[3]}_${d[2]}.pdf`.replace(/[\\/:*?"<>|]+/g, '_');
+        await html2pdf().set({ ...base, filename }).from(items[i]).save();
+        ok++;
+        await new Promise(r => setTimeout(r, 300));
       }
-      pdf.save(currentPdfFilename);
     } catch (err) {
-      alert('Gagal membuat PDF: ' + err);
+      alert(`Gagal membuat PDF (berhasil ${ok} dari ${items.length}): ${err}`);
     } finally {
       btn.disabled = false; btn.innerText = '⬇️ Download PDF';
     }
