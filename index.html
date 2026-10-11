@@ -5,6 +5,7 @@
   <title>STAR-PK - Fitur Asesmen Rehabilitasi dan Reedukasi</title>
   <link rel="icon" href="logo-starpk.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -39,6 +40,30 @@
     .star-title { font-weight:600; color:#0E203C; }
     .star-sub { color:#0E203C; font-weight:500; font-size:.95rem; }
     .star-footer { position:absolute; bottom:24px; left:0; right:0; text-align:center; color:rgba(255,255,255,.55); font-size:.9rem; }
+    .star-shell { min-height:100vh; }
+    .star-side { width:270px; flex:0 0 270px; background:#0E203C; color:#fff; transition:margin .25s; overflow-y:auto; height:100vh; position:sticky; top:0; padding-bottom:24px; }
+    .star-shell.collapsed .star-side { margin-left:-270px; }
+    .star-side-logo { padding:18px 20px; text-align:center; } .star-side-logo img { max-width:100%; height:64px; object-fit:contain; background:#fff; border-radius:6px; padding:4px 8px; }
+    .star-side-label { padding:14px 24px 6px; font-weight:600; letter-spacing:.08em; font-size:.85rem; color:#fff; }
+    .side-item { display:flex; align-items:center; gap:12px; padding:11px 24px; color:#fff; cursor:pointer; text-decoration:none; font-size:1rem; user-select:none; border:0; background:transparent; width:100%; text-align:left; }
+    .side-item i.bi:first-child { font-size:1.2rem; width:22px; }
+    .side-item:hover { background:rgba(255,255,255,.06); color:#fff; }
+    .side-item.active { color:#F5B800; }
+    .side-item .chev { margin-left:auto; font-size:.8rem; transition:transform .2s; }
+    .side-group.open > .side-item .chev { transform:rotate(90deg); }
+    .side-sub { display:none; padding-left:22px; } .side-group.open > .side-sub { display:block; }
+    .side-sub .side-item { font-size:.93rem; padding:8px 24px; }
+    .star-main { flex:1; min-width:0; display:flex; flex-direction:column; }
+    .star-topbar { background:#13234a; background:linear-gradient(90deg,#0E203C,#16294a); height:64px; display:flex; align-items:center; padding:0 20px; gap:12px; position:sticky; top:0; z-index:100; }
+    .star-iconbtn { background:none; border:0; color:#F5B800; font-size:2rem; line-height:1; }
+    .star-user { color:#fff; font-weight:500; }
+    .star-content { padding:28px 32px; flex:1; }
+    .star-panel { border-radius:12px; border:1px solid #E4E6EB; }
+    .star-welcome { background:linear-gradient(135deg,#0E203C,#2F4F7F); color:#fff; border-radius:16px; padding:28px 32px; }
+    .mod-card { border:1px solid #E4E6EB; border-radius:12px; padding:20px; display:flex; gap:16px; align-items:center; cursor:pointer; background:#fff; transition:box-shadow .2s, transform .2s; height:100%; }
+    .mod-card:hover { box-shadow:0 6px 18px rgba(14,32,60,.12); transform:translateY(-2px); }
+    .mod-card .ic { width:52px; height:52px; border-radius:12px; background:#FFF6D6; color:#B58900; display:flex; align-items:center; justify-content:center; font-size:1.6rem; flex:0 0 52px; }
+    @media (max-width:991px) { .star-shell:not(.collapsed) .star-side { position:fixed; left:0; top:0; z-index:200; } .star-content { padding:16px; } }
   </style>
 </head>
 <body class="bg-light">
@@ -83,28 +108,39 @@
 </div>
 
 <!-- DIV APLIKASI UTAMA -->
-<div class="container-fluid py-3 px-4" id="appSection" style="display:none;">
-  <div class="d-flex justify-content-between align-items-center mb-3 pb-2 star-header">
-    <div class="d-flex align-items-center gap-3">
-      <img src="logo-starpk.png" alt="STAR-PK" style="height: 46px;">
-      <div class="border-start ps-3 lh-sm d-none d-md-block"><div class="fw-bold" style="color:#0E203C;">Fitur Asesmen Rehabilitasi dan Reedukasi</div><small class="text-muted">Kementerian Imigrasi dan Pemasyarakatan</small></div>
-    </div>
-    <div>
-      <span id="userInfo" class="badge bg-secondary me-2"></span>
-      <button id="btnTtdSaya" class="btn btn-sm btn-outline-primary me-2" onclick="openTtdModal()">✍️ Tanda Tangan Saya</button>
-      <button id="btnToggleLock" class="btn btn-sm me-2 d-none" onclick="toggleKunciAplikasi()"></button>
-      <button class="btn btn-sm btn-outline-danger" onclick="location.reload()">Keluar</button>
-    </div>
-  </div>
+<div id="appSection" class="star-shell" style="display:none;">
+  <aside class="star-side">
+    <div class="star-side-logo"><img src="logo-starpk.png" alt="STAR-PK"></div>
+    <div class="star-side-label">MENU</div>
+    <nav id="sideNav"></nav>
+  </aside>
+  <div class="star-main">
+    <header class="star-topbar">
+      <button class="star-iconbtn" onclick="document.getElementById('appSection').classList.toggle('collapsed')" title="Menu"><i class="bi bi-list"></i></button>
+      <div class="ms-auto d-flex align-items-center gap-2 flex-wrap justify-content-end">
+        <span id="userInfo" class="star-user"></span>
+        <button id="btnTtdSaya" class="btn btn-sm btn-outline-light" onclick="openTtdModal()"><i class="bi bi-pen"></i> Tanda Tangan Saya</button>
+        <button id="btnToggleLock" class="btn btn-sm d-none" onclick="toggleKunciAplikasi()"></button>
+        <button class="btn btn-sm btn-warning" onclick="location.reload()"><i class="bi bi-box-arrow-right"></i> Keluar</button>
+      </div>
+    </header>
+    <div class="star-content">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="m-0 text-uppercase fw-bold" id="pageTitle" style="color:#0E203C;">Laman</h5>
+        <small class="text-muted" id="pageCrumb">Laman</small>
+      </div>
 
   <!-- BANNER PENGUNCI APLIKASI (Disembunyikan secara default) -->
   <div id="lockBanner" class="alert alert-danger text-center fw-bold d-none mb-3 shadow-sm">
     🔒 APLIKASI TERKUNCI: Sesi penginputan dan pengubahan data asesmen telah ditutup.
   </div>
 
-  <ul class="nav nav-tabs" id="mainTabs">
+  <ul class="nav nav-tabs d-none" id="mainTabs">
+    <li class="nav-item" id="tabBerandaContainer">
+      <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabBeranda" type="button">Laman</button>
+    </li>
     <li class="nav-item">
-      <button class="nav-link active fw-bold text-primary" data-bs-toggle="tab" data-bs-target="#tabDashboard" type="button" onclick="loadDataList()">📋 Data Asesmen</button>
+      <button class="nav-link fw-bold text-primary" data-bs-toggle="tab" data-bs-target="#tabDashboard" type="button" onclick="loadDataList()">📋 Data Asesmen</button>
     </li>
     <li class="nav-item d-none" id="tabEksekutifContainer">
       <button class="nav-link fw-bold text-info" data-bs-toggle="tab" data-bs-target="#tabEksekutif" type="button" onclick="loadEksekutif()">📊 Dashboard Eksekutif</button>
@@ -129,8 +165,18 @@
     </li>
   </ul>
 
-  <div class="tab-content bg-white p-4 border border-top-0 shadow-sm">
-    
+  <div class="tab-content bg-white p-4 shadow-sm star-panel">
+
+    <!-- LAMAN (BERANDA) -->
+    <div class="tab-pane fade show active" id="tabBeranda">
+      <div class="star-welcome mb-4">
+        <div class="small text-uppercase" style="letter-spacing:.15em;opacity:.8;" id="welGreet">Selamat datang</div>
+        <h2 class="fw-bold my-1" id="welNama"></h2>
+        <div style="opacity:.85;" id="welInfo"></div>
+      </div>
+      <div class="row g-3" id="berandaCards"></div>
+    </div>
+
     <!-- DASHBOARD EKSEKUTIF -->
     <div class="tab-pane fade" id="tabEksekutif">
       <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
@@ -154,7 +200,7 @@
     </div>
 
     <!-- DASHBOARD -->
-    <div class="tab-pane fade show active" id="tabDashboard">
+    <div class="tab-pane fade" id="tabDashboard">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="m-0">Daftar Hasil Asesmen Narapidana</h5>
         <button class="btn btn-sm btn-info text-white" onclick="loadDataList()">🔄 Refresh Data</button>
@@ -432,6 +478,8 @@
       </div>
     </div>
   </div>
+    </div>
+  </div>
 </div>
 
 <!-- MODAL GENERIK UNTUK KELOLA WILAYAH / UPT / USER -->
@@ -509,6 +557,79 @@
 
   // Menyesuaikan tab & tombol yang tampil sesuai tingkat organisasi user login.
   // User tingkat UPT (termasuk Kepala Bapas) tidak mendapat perubahan apapun.
+  // Enam modul utama STAR-PK. Ubah aktif:true saat modul siap; sementara disembunyikan.
+  // Fitur Asesmen Rehabilitasi dan Reedukasi nantinya berada di bawah modul Litmas.
+  const MODUL_UTAMA = [
+    { nama: 'Registrasi Warga Binaan', icon: 'bi-person-vcard', aktif: false },
+    { nama: 'Penelitian Kemasyarakatan (Litmas)', icon: 'bi-journal-text', aktif: false },
+    { nama: 'Pendampingan', icon: 'bi-people', aktif: false },
+    { nama: 'Pembimbingan', icon: 'bi-person-check', aktif: false },
+    { nama: 'Pengawasan', icon: 'bi-eye', aktif: false },
+    { nama: 'Sidang TPP', icon: 'bi-hammer', aktif: false }
+  ];
+  const SIDE_MENU = [
+    { label: 'Laman', icon: 'bi-speedometer2', box: 'tabBerandaContainer' },
+    { label: 'Asesmen Rehabilitasi & Reedukasi', icon: 'bi-clipboard2-pulse', children: [
+      { label: 'Data Asesmen', icon: 'bi-table', box: 'tabDashboard', tab: true },
+      { label: 'Asesmen Baru', icon: 'bi-plus-circle', box: 'tabFormContainer' },
+      { label: 'Dashboard Eksekutif', icon: 'bi-bar-chart-line', box: 'tabEksekutifContainer' },
+      { label: 'Wilayah Kerja Bapas', icon: 'bi-map', box: 'tabWilayahKerjaContainer' }
+    ]},
+    { label: 'Administrasi', icon: 'bi-gear', children: [
+      { label: 'Kelola Wilayah', icon: 'bi-buildings', box: 'tabWilayahContainer' },
+      { label: 'Kelola UPT', icon: 'bi-bank', box: 'tabUptContainer' },
+      { label: 'Kelola User', icon: 'bi-person-gear', box: 'tabUserContainer' },
+      { label: 'Profil Ditjen', icon: 'bi-building', box: 'tabDitjenContainer' }
+    ]}
+  ];
+  const sideBtn = it => it.tab ? document.querySelector('#mainTabs [data-bs-target="#tabDashboard"]') : document.getElementById(it.box).querySelector('button');
+  const sideHidden = it => { const el = it.tab ? sideBtn(it).parentElement : document.getElementById(it.box); return el.classList.contains('d-none') || el.style.display === 'none'; };
+
+  function initShell() {
+    if (window.__shellInit) { syncSidebar(); return; }
+    window.__shellInit = true;
+    if (window.innerWidth < 992) document.getElementById('appSection').classList.add('collapsed');
+    const nav = document.getElementById('sideNav');
+    const item = (it, extra = '') => `<a class="side-item ${extra}" data-box="${it.box || ''}"><i class="bi ${it.icon}"></i><span>${it.label}</span>${it.children ? '<i class="bi bi-chevron-right chev"></i>' : ''}</a>`;
+    nav.innerHTML = MODUL_UTAMA.filter(m => m.aktif).map(m => item(m)).join('') + SIDE_MENU.map((g, gi) => g.children
+      ? `<div class="side-group open" data-g="${gi}">${item(g)}<div class="side-sub">${g.children.map((c, ci) => item(c).replace('<a ', `<a data-c="${gi}-${ci}" `)).join('')}</div></div>`
+      : item(g).replace('<a ', `<a data-c="${gi}" `)).join('');
+    nav.querySelectorAll('.side-group > .side-item').forEach(h => h.onclick = () => h.parentElement.classList.toggle('open'));
+    nav.querySelectorAll('[data-c]').forEach(a => a.onclick = () => {
+      const [gi, ci] = a.dataset.c.split('-');
+      const it = ci === undefined ? SIDE_MENU[gi] : SIDE_MENU[gi].children[ci];
+      sideBtn(it).click();
+      if (window.innerWidth < 992) document.getElementById('appSection').classList.add('collapsed');
+    });
+    new MutationObserver(syncSidebar).observe(document.getElementById('mainTabs'), { subtree: true, attributes: true, attributeFilter: ['class', 'style'] });
+    document.addEventListener('shown.bs.tab', e => {
+      const t = e.target.getAttribute('data-bs-target');
+      nav.querySelectorAll('[data-c]').forEach(a => {
+        const [gi, ci] = a.dataset.c.split('-');
+        const it = ci === undefined ? SIDE_MENU[gi] : SIDE_MENU[gi].children[ci];
+        const on = sideBtn(it).getAttribute('data-bs-target') === t;
+        a.classList.toggle('active', on);
+        if (on) { document.getElementById('pageTitle').innerText = it.label; document.getElementById('pageCrumb').innerText = (ci === undefined ? '' : SIDE_MENU[gi].label + ' › ') + it.label; }
+      });
+    });
+    document.querySelector('[data-c="0"]').classList.add('active');
+    const hr = new Date().getHours();
+    document.getElementById('welGreet').innerText = 'Selamat ' + (hr < 11 ? 'pagi' : hr < 15 ? 'siang' : hr < 18 ? 'sore' : 'malam');
+    document.getElementById('welNama').innerText = asr;
+    document.getElementById('welInfo').innerText = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) + (userJabatan ? ' · ' + userJabatan : '') + ' · ' + ({ UPT: 'UPT', KANWIL: 'Kanwil', DITJEN: 'Ditjenpas' }[userTingkat] || '');
+    document.getElementById('berandaCards').innerHTML = `<div class="col-md-6 col-xl-4"><div class="mod-card" onclick="sideBtn(SIDE_MENU[1].children[0]).click()"><div class="ic"><i class="bi bi-clipboard2-pulse"></i></div><div><div class="fw-bold" style="color:#0E203C;">Asesmen Rehabilitasi dan Reedukasi</div><small class="text-muted">Input, kelola, dan cetak hasil asesmen warga binaan</small></div></div></div>`;
+    syncSidebar();
+  }
+  function syncSidebar() {
+    const nav = document.getElementById('sideNav');
+    SIDE_MENU.forEach((g, gi) => {
+      if (!g.children) { const a = nav.querySelector(`[data-c="${gi}"]`); if (a) a.style.display = sideHidden(g) ? 'none' : ''; return; }
+      let any = false;
+      g.children.forEach((c, ci) => { const a = nav.querySelector(`[data-c="${gi}-${ci}"]`), h = sideHidden(c); if (a) a.style.display = h ? 'none' : ''; if (!h) any = true; });
+      nav.querySelector(`[data-g="${gi}"]`).style.display = any ? '' : 'none';
+    });
+  }
+
   function applyStrukturOrganisasiUI() {
     document.getElementById('thUptAsesor').classList.toggle('d-none', userTingkat === 'UPT');
     document.getElementById('thKanwilAsesor').classList.toggle('d-none', userTingkat === 'UPT');
@@ -561,7 +682,7 @@
           userUptId = r.user.upt_id || null;
           userKanwilId = r.user.kanwil_id || null;
           document.getElementById('loginSection').style.display = 'none'; 
-          document.getElementById('appSection').style.display = 'block'; 
+          document.getElementById('appSection').style.display = 'flex'; initShell(); 
           document.getElementById('userInfo').innerText = asr; 
 
           applyStrukturOrganisasiUI();
