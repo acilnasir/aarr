@@ -1073,11 +1073,11 @@
     let d = globalDataMap[id];
     if(!d) return alert("Data tidak valid di memory.");
     
-    activeEditNoreg = d[3]; 
+    // Klik tab memanggil resetFormForNew(), jadi harus dilakukan sebelum mode edit diaktifkan.
+    document.querySelector('[data-bs-target="#tabForm"]').click();
+    activeEditNoreg = d[3];
     document.getElementById('editAlert').classList.remove('d-none');
     document.getElementById('editIdLabel').innerText = activeEditNoreg;
-    
-    document.querySelector('[data-bs-target="#tabForm"]').click();
     document.querySelector('[data-bs-target="#f_tab0"]').click();
     
     let textFields = ['id_nama','id_noreg','id_upt','id_ttl','id_usia','id_tglasesmen','id_pasal','id_lamapidana',
