@@ -1,0 +1,9 @@
+{
+  "name": "star-pk-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "STAR-PK - situs statis",
+  "scripts": {
+    "build": "node build.mjs"
+  }
+}
