@@ -1,20 +1,27 @@
 // Supabase Edge Function: "api"
 // Pengganti Code.gs (Google Apps Script) yang sebelumnya berjalan di Google Sheets.
-// Mendukung action yang sama persis: login, save, read, update, delete.
+//
+// Mendukung action lama (login, save, read, update, delete) PLUS struktur
+// organisasi berjenjang nasional: UPT (kab/kota) -> KANWIL (provinsi) -> DITJEN
+// (nasional). Setiap action sensitif kini memerlukan token sesi (dikembalikan
+// oleh "login") yang ditandatangani HMAC-SHA256 di server, sehingga identitas
+// & lingkup kewenangan pemanggil tidak bisa dipalsukan dari client.
 //
 // Deploy: supabase functions deploy api --no-verify-jwt
 //
 // Env vars SUPABASE_URL & SUPABASE_SERVICE_ROLE_KEY otomatis tersedia di
 // runtime Edge Function Supabase, tidak perlu di-set manual.
+// APP_SESSION_SECRET harus di-set manual lewat `supabase secrets set`.
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-// compareSync (bukan compare async) dipakai karena versi async memakai Worker,
-// yang tidak tersedia di runtime Supabase Edge Functions.
-import { compareSync } from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
+// compareSync/hashSync (bukan versi async) dipakai karena versi async memakai
+// Worker, yang tidak tersedia di runtime Supabase Edge Functions.
+import { compareSync, hashSync } from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const SESSION_SECRET = Deno.env.get("APP_SESSION_SECRET") ?? "";
 
 // Service role key -> bypass RLS, hanya dipakai di server (aman, tidak pernah dikirim ke browser).
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
@@ -25,6 +32,88 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 jam
+
+type Tingkat = "UPT" | "KANWIL" | "DITJEN";
+
+interface SessionPayload {
+  username: string;
+  nama: string;
+  peran: string;
+  tingkat: Tingkat;
+  upt_id: string | null;
+  kanwil_id: string | null;
+  exp: number; // epoch ms
+}
+
+// ---------------------------------------------------------------------------
+// Util: base64url + HMAC-SHA256 untuk token sesi (mirip JWT yang disederhanakan)
+// ---------------------------------------------------------------------------
+function base64UrlEncode(bytes: Uint8Array): string {
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function base64UrlDecode(str: string): Uint8Array {
+  const padded = str.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((str.length + 3) % 4);
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+let cachedKey: CryptoKey | null = null;
+async function getHmacKey(): Promise<CryptoKey> {
+  if (cachedKey) return cachedKey;
+  cachedKey = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(SESSION_SECRET),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign", "verify"],
+  );
+  return cachedKey;
+}
+
+async function signToken(payload: SessionPayload): Promise<string> {
+  const body = base64UrlEncode(new TextEncoder().encode(JSON.stringify(payload)));
+  const key = await getHmacKey();
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(body));
+  return `${body}.${base64UrlEncode(new Uint8Array(sig))}`;
+}
+
+async function verifyToken(token: unknown): Promise<SessionPayload | null> {
+  if (typeof token !== "string" || !token.includes(".")) return null;
+  const [body, sig] = token.split(".");
+  try {
+    const key = await getHmacKey();
+    const valid = await crypto.subtle.verify(
+      "HMAC",
+      key,
+      base64UrlDecode(sig),
+      new TextEncoder().encode(body),
+    );
+    if (!valid) return null;
+    const payload = JSON.parse(new TextDecoder().decode(base64UrlDecode(body))) as SessionPayload;
+    if (!payload.exp || payload.exp < Date.now()) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+function unauthorized(message = "Sesi tidak valid, silakan login ulang.") {
+  return { success: false, message, code: "UNAUTHORIZED" };
+}
+
+function forbidden(message = "Anda tidak memiliki akses untuk aksi ini.") {
+  return { success: false, message, code: "FORBIDDEN" };
+}
+
+// ---------------------------------------------------------------------------
+// HTTP entrypoint
+// ---------------------------------------------------------------------------
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: CORS_HEADERS });
@@ -33,38 +122,105 @@ serve(async (req: Request) => {
   try {
     const body = await req.json();
     const action = body.action;
-    let result: Record<string, unknown>;
 
+    // Aksi yang tidak memerlukan sesi login sebelumnya.
+    if (action === "login") {
+      const result = await checkLogin(body.username, body.password);
+      return json(result);
+    }
+
+    // Semua aksi lain memerlukan token sesi yang valid.
+    const session = await verifyToken(body.token);
+    if (!session) {
+      return json(unauthorized());
+    }
+
+    let result: Record<string, unknown>;
     switch (action) {
-      case "login":
-        result = await checkLogin(body.username, body.password);
-        break;
+      // --- Data asesmen (dibatasi lingkup organisasi) ---
       case "save":
-        result = await saveDataAsesmen(body.payload);
+        result = await saveDataAsesmen(session, body.payload);
         break;
       case "read":
-        result = await readDataAsesmen();
+        result = await readDataAsesmen(session);
         break;
       case "update":
-        result = await updateDataAsesmen(body.id, body.payload);
+        result = await updateDataAsesmen(session, body.id, body.payload);
         break;
       case "delete":
-        result = await deleteDataAsesmen(body.id);
+        result = await deleteDataAsesmen(session, body.id);
         break;
+
+      // --- Akun sendiri ---
+      case "changePassword":
+        result = await changePassword(session, body.currentPassword, body.newPassword);
+        break;
+
+      // --- Kelola Wilayah (Kanwil) ---
+      case "listKanwil":
+        result = await listKanwil(session);
+        break;
+      case "createKanwil":
+        result = await createKanwil(session, body.payload);
+        break;
+      case "updateKanwil":
+        result = await updateKanwil(session, body.id, body.payload);
+        break;
+      case "deleteKanwil":
+        result = await deleteKanwil(session, body.id);
+        break;
+
+      // --- Kelola UPT ---
+      case "listUpt":
+        result = await listUpt(session);
+        break;
+      case "createUpt":
+        result = await createUpt(session, body.payload);
+        break;
+      case "updateUpt":
+        result = await updateUpt(session, body.id, body.payload);
+        break;
+      case "deleteUpt":
+        result = await deleteUpt(session, body.id);
+        break;
+
+      // --- Profil Ditjen (singleton) ---
+      case "getDitjenProfile":
+        result = await getDitjenProfile(session);
+        break;
+      case "updateDitjenProfile":
+        result = await updateDitjenProfile(session, body.payload);
+        break;
+
+      // --- Kelola User ---
+      case "listUsers":
+        result = await listUsers(session);
+        break;
+      case "createUser":
+        result = await createUser(session, body.payload);
+        break;
+      case "updateUser":
+        result = await updateUser(session, body.username, body.payload);
+        break;
+      case "deleteUser":
+        result = await deleteUser(session, body.username);
+        break;
+
       default:
         result = { success: false, message: "Aksi tidak dikenal." };
     }
 
-    return new Response(JSON.stringify(result), {
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
-    });
+    return json(result);
   } catch (error) {
-    return new Response(
-      JSON.stringify({ success: false, message: String(error) }),
-      { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } },
-    );
+    return json({ success: false, message: String(error) });
   }
 });
+
+function json(result: Record<string, unknown>) {
+  return new Response(JSON.stringify(result), {
+    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+  });
+}
 
 // Mengembalikan timestamp "yyyy-MM-dd HH:mm:ss" pada zona waktu Jakarta (GMT+7),
 // identik dengan format ID yang dipakai Code.gs sebelumnya.
@@ -84,10 +240,13 @@ function nowJakartaTimestamp(): string {
   return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}:${get("second")}`;
 }
 
+// ---------------------------------------------------------------------------
+// Login
+// ---------------------------------------------------------------------------
 async function checkLogin(username: string, password: string) {
   const { data, error } = await supabase
     .from("users")
-    .select("username, password_hash, nama, peran")
+    .select("username, password_hash, nama, peran, tingkat, upt_id, kanwil_id")
     .eq("username", username)
     .maybeSingle();
 
@@ -100,18 +259,75 @@ async function checkLogin(username: string, password: string) {
     return { success: false, message: "Username/password salah!" };
   }
 
+  const sessionPayload: SessionPayload = {
+    username: data.username,
+    nama: data.nama,
+    peran: data.peran,
+    tingkat: (data.tingkat ?? "UPT") as Tingkat,
+    upt_id: data.upt_id,
+    kanwil_id: data.kanwil_id,
+    exp: Date.now() + SESSION_TTL_MS,
+  };
+  const token = await signToken(sessionPayload);
+
   return {
     success: true,
-    user: { username: data.username, nama: data.nama, peran: data.peran },
+    token,
+    user: {
+      username: data.username,
+      nama: data.nama,
+      peran: data.peran,
+      tingkat: sessionPayload.tingkat,
+      upt_id: data.upt_id,
+      kanwil_id: data.kanwil_id,
+    },
   };
 }
 
-// payload[2] = No. Register (lihat urutan field di submitData() pada index.html)
+// ---------------------------------------------------------------------------
+// Ganti password (akun sendiri)
+// ---------------------------------------------------------------------------
+async function changePassword(session: SessionPayload, currentPassword: string, newPassword: string) {
+  if (!newPassword || String(newPassword).length < 6) {
+    return { success: false, message: "Password baru minimal 6 karakter." };
+  }
+
+  const { data, error } = await supabase
+    .from("users")
+    .select("password_hash")
+    .eq("username", session.username)
+    .maybeSingle();
+
+  if (error || !data) {
+    return { success: false, message: "User tidak ditemukan." };
+  }
+  if (!compareSync(currentPassword ?? "", data.password_hash)) {
+    return { success: false, message: "Password lama salah." };
+  }
+
+  const newHash = hashSync(newPassword);
+  const { error: updError } = await supabase
+    .from("users")
+    .update({ password_hash: newHash })
+    .eq("username", session.username);
+
+  if (updError) {
+    return { success: false, message: "Gagal mengubah password: " + updError.message };
+  }
+  return { success: true, message: "Password berhasil diubah." };
+}
+
+// ---------------------------------------------------------------------------
+// Data Asesmen (payload[2] = No. Register, lihat submitData() di index.html)
+// ---------------------------------------------------------------------------
 function extractNoRegister(payload: unknown[]): string {
   return String(payload[2] ?? "").trim();
 }
 
-async function saveDataAsesmen(payload: unknown[]) {
+async function saveDataAsesmen(session: SessionPayload, payload: unknown[]) {
+  if (session.tingkat !== "UPT") {
+    return forbidden("Hanya user tingkat UPT yang dapat menginput data asesmen.");
+  }
   const id = nowJakartaTimestamp();
   const noRegister = extractNoRegister(payload);
 
@@ -119,6 +335,7 @@ async function saveDataAsesmen(payload: unknown[]) {
     id,
     no_register: noRegister,
     payload,
+    upt_id: session.upt_id, // selalu diisi dari sesi, bukan dari client
   });
 
   if (error) {
@@ -127,34 +344,71 @@ async function saveDataAsesmen(payload: unknown[]) {
   return { success: true, message: "Data asesmen berhasil ditambahkan!" };
 }
 
-async function readDataAsesmen() {
-  const { data, error } = await supabase
-    .from("hasil_asesmen")
-    .select("id, payload")
-    .order("created_at", { ascending: false }); // data terbaru tampil di atas, sama seperti sebelumnya
+// Mengembalikan daftar id UPT yang boleh dilihat pemanggil (lingkup berjenjang).
+async function scopedUptIds(session: SessionPayload): Promise<string[] | null> {
+  // null berarti "tanpa filter" (DITJEN melihat semua).
+  if (session.tingkat === "DITJEN") return null;
+  if (session.tingkat === "UPT") return session.upt_id ? [session.upt_id] : [];
 
+  // KANWIL: seluruh UPT dalam provinsi (kanwil) miliknya.
+  const { data, error } = await supabase
+    .from("upt")
+    .select("id")
+    .eq("kanwil_id", session.kanwil_id);
+  if (error || !data) return [];
+  return data.map((r) => r.id as string);
+}
+
+async function readDataAsesmen(session: SessionPayload) {
+  const uptIds = await scopedUptIds(session);
+  if (uptIds !== null && uptIds.length === 0) {
+    return { success: true, data: [] };
+  }
+
+  let query = supabase
+    .from("hasil_asesmen")
+    .select("id, payload, upt_id, upt:upt_id(nama, kanwil:kanwil_id(nama))")
+    .order("created_at", { ascending: false });
+  if (uptIds !== null) {
+    query = query.in("upt_id", uptIds);
+  }
+
+  const { data, error } = await query;
   if (error) {
     return { success: false, message: "Gagal membaca data: " + error.message };
   }
 
-  // Bentuk ulang menjadi array [id, ...payload] agar identik dengan format
-  // lama dari Google Sheets, supaya frontend tidak perlu diubah.
-  const records = (data ?? []).map((row) => [row.id, ...(row.payload as unknown[])]);
+  // Bentuk ulang menjadi array [id, ...payload, upt_nama, kanwil_nama] agar
+  // tetap identik (di 0..N) dengan format lama dari Google Sheets -- 2 kolom
+  // tambahan di ujung dipakai khusus oleh dashboard pemantauan Kanwil/Ditjen.
+  // deno-lint-ignore no-explicit-any
+  const records = (data ?? []).map((row: any) => [
+    row.id,
+    ...(row.payload as unknown[]),
+    row.upt?.nama ?? "",
+    row.upt?.kanwil?.nama ?? "",
+  ]);
   return { success: true, data: records };
 }
 
-async function updateDataAsesmen(idNoreg: string, payload: unknown[]) {
+async function updateDataAsesmen(session: SessionPayload, idNoreg: string, payload: unknown[]) {
+  if (session.tingkat !== "UPT") {
+    return forbidden("Hanya user tingkat UPT yang dapat mengubah data asesmen.");
+  }
   const target = String(idNoreg).trim();
   const newNoRegister = extractNoRegister(payload);
 
   const { data: existing, error: findError } = await supabase
     .from("hasil_asesmen")
-    .select("id")
+    .select("id, upt_id")
     .eq("no_register", target)
     .maybeSingle();
 
   if (findError || !existing) {
     return { success: false, message: "Gagal update. No. Register tidak ditemukan di database." };
+  }
+  if (existing.upt_id !== session.upt_id) {
+    return forbidden("Data ini bukan milik UPT Anda.");
   }
 
   const { error: updateError } = await supabase
@@ -168,17 +422,23 @@ async function updateDataAsesmen(idNoreg: string, payload: unknown[]) {
   return { success: true, message: "Data asesmen berhasil diperbarui (ditimpa)!" };
 }
 
-async function deleteDataAsesmen(idNoreg: string) {
+async function deleteDataAsesmen(session: SessionPayload, idNoreg: string) {
+  if (session.tingkat !== "UPT") {
+    return forbidden("Hanya user tingkat UPT yang dapat menghapus data asesmen.");
+  }
   const target = String(idNoreg).trim();
 
   const { data: existing, error: findError } = await supabase
     .from("hasil_asesmen")
-    .select("id")
+    .select("id, upt_id")
     .eq("no_register", target)
     .maybeSingle();
 
   if (findError || !existing) {
     return { success: false, message: "Gagal hapus. No. Register tidak ditemukan." };
+  }
+  if (existing.upt_id !== session.upt_id) {
+    return forbidden("Data ini bukan milik UPT Anda.");
   }
 
   const { error: deleteError } = await supabase
@@ -190,4 +450,274 @@ async function deleteDataAsesmen(idNoreg: string) {
     return { success: false, message: "Gagal hapus: " + deleteError.message };
   }
   return { success: true, message: "Data berhasil dihapus!" };
+}
+
+// ---------------------------------------------------------------------------
+// Kelola Wilayah (Kanwil) -- DITJEN: CRUD penuh. KANWIL: hanya lihat profil sendiri.
+// ---------------------------------------------------------------------------
+async function listKanwil(session: SessionPayload) {
+  if (session.tingkat === "UPT") return forbidden();
+
+  let query = supabase.from("kanwil").select("*").order("nama");
+  if (session.tingkat === "KANWIL") {
+    query = query.eq("id", session.kanwil_id);
+  }
+  const { data, error } = await query;
+  if (error) return { success: false, message: error.message };
+  return { success: true, data };
+}
+
+async function createKanwil(session: SessionPayload, payload: Record<string, unknown>) {
+  if (session.tingkat !== "DITJEN") return forbidden("Hanya Ditjen yang dapat membuat Kanwil.");
+  const { nama, provinsi, alamat, kepala } = payload;
+  if (!nama || !provinsi) return { success: false, message: "Nama dan provinsi wajib diisi." };
+
+  const { data, error } = await supabase
+    .from("kanwil")
+    .insert({ nama, provinsi, alamat, kepala })
+    .select()
+    .single();
+  if (error) return { success: false, message: error.message };
+  return { success: true, message: "Kanwil berhasil ditambahkan.", data };
+}
+
+async function updateKanwil(session: SessionPayload, id: string, payload: Record<string, unknown>) {
+  if (session.tingkat !== "DITJEN") return forbidden("Hanya Ditjen yang dapat mengubah profil Kanwil.");
+  const { nama, provinsi, alamat, kepala } = payload;
+
+  const { error } = await supabase
+    .from("kanwil")
+    .update({ nama, provinsi, alamat, kepala, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) return { success: false, message: error.message };
+  return { success: true, message: "Kanwil berhasil diperbarui." };
+}
+
+async function deleteKanwil(session: SessionPayload, id: string) {
+  if (session.tingkat !== "DITJEN") return forbidden("Hanya Ditjen yang dapat menghapus Kanwil.");
+
+  const { error } = await supabase.from("kanwil").delete().eq("id", id);
+  if (error) {
+    return { success: false, message: "Gagal hapus (pastikan tidak ada UPT yang masih terhubung): " + error.message };
+  }
+  return { success: true, message: "Kanwil berhasil dihapus." };
+}
+
+// ---------------------------------------------------------------------------
+// Kelola UPT -- DITJEN: CRUD penuh. KANWIL: hanya lihat & ubah UPT di provinsinya.
+// ---------------------------------------------------------------------------
+async function listUpt(session: SessionPayload) {
+  if (session.tingkat === "UPT") return forbidden();
+
+  let query = supabase.from("upt").select("*, kanwil:kanwil_id(nama, provinsi)").order("nama");
+  if (session.tingkat === "KANWIL") {
+    query = query.eq("kanwil_id", session.kanwil_id);
+  }
+  const { data, error } = await query;
+  if (error) return { success: false, message: error.message };
+  return { success: true, data };
+}
+
+async function createUpt(session: SessionPayload, payload: Record<string, unknown>) {
+  if (session.tingkat !== "DITJEN") return forbidden("Hanya Ditjen yang dapat membuat UPT baru.");
+  const { kanwil_id, nama, jenis, alamat, kepala } = payload;
+  if (!kanwil_id || !nama || !jenis) {
+    return { success: false, message: "Kanwil, nama, dan jenis UPT wajib diisi." };
+  }
+
+  const { data, error } = await supabase
+    .from("upt")
+    .insert({ kanwil_id, nama, jenis, alamat, kepala })
+    .select()
+    .single();
+  if (error) return { success: false, message: error.message };
+  return { success: true, message: "UPT berhasil ditambahkan.", data };
+}
+
+async function updateUpt(session: SessionPayload, id: string, payload: Record<string, unknown>) {
+  if (session.tingkat === "UPT") return forbidden();
+
+  // Kanwil hanya boleh mengubah UPT di provinsinya sendiri.
+  if (session.tingkat === "KANWIL") {
+    const { data: existing, error: findError } = await supabase
+      .from("upt")
+      .select("kanwil_id")
+      .eq("id", id)
+      .maybeSingle();
+    if (findError || !existing) return { success: false, message: "UPT tidak ditemukan." };
+    if (existing.kanwil_id !== session.kanwil_id) {
+      return forbidden("UPT ini berada di luar provinsi Anda.");
+    }
+  }
+
+  const { nama, jenis, alamat, kepala } = payload;
+  const update: Record<string, unknown> = { nama, jenis, alamat, kepala, updated_at: new Date().toISOString() };
+  // Hanya Ditjen yang boleh memindahkan UPT ke Kanwil lain.
+  if (session.tingkat === "DITJEN" && payload.kanwil_id) update.kanwil_id = payload.kanwil_id;
+
+  const { error } = await supabase.from("upt").update(update).eq("id", id);
+  if (error) return { success: false, message: error.message };
+  return { success: true, message: "UPT berhasil diperbarui." };
+}
+
+async function deleteUpt(session: SessionPayload, id: string) {
+  if (session.tingkat !== "DITJEN") return forbidden("Hanya Ditjen yang dapat menghapus UPT.");
+
+  const { error } = await supabase.from("upt").delete().eq("id", id);
+  if (error) {
+    return { success: false, message: "Gagal hapus (pastikan tidak ada user/data asesmen yang masih terhubung): " + error.message };
+  }
+  return { success: true, message: "UPT berhasil dihapus." };
+}
+
+// ---------------------------------------------------------------------------
+// Profil Ditjen (singleton) -- DITJEN: lihat & ubah. KANWIL: lihat saja.
+// ---------------------------------------------------------------------------
+async function getDitjenProfile(session: SessionPayload) {
+  if (session.tingkat === "UPT") return forbidden();
+
+  const { data, error } = await supabase.from("ditjen_profile").select("*").eq("id", 1).maybeSingle();
+  if (error) return { success: false, message: error.message };
+  return { success: true, data };
+}
+
+async function updateDitjenProfile(session: SessionPayload, payload: Record<string, unknown>) {
+  if (session.tingkat !== "DITJEN") return forbidden("Hanya Ditjen yang dapat mengubah profil ini.");
+  const { nama, alamat, dirjen } = payload;
+
+  const { error } = await supabase
+    .from("ditjen_profile")
+    .update({ nama, alamat, dirjen, updated_at: new Date().toISOString() })
+    .eq("id", 1);
+  if (error) return { success: false, message: error.message };
+  return { success: true, message: "Profil Ditjen berhasil diperbarui." };
+}
+
+// ---------------------------------------------------------------------------
+// Kelola User -- DITJEN: semua user. KANWIL: user UPT di provinsinya + user
+// KANWIL lain di provinsi yang sama (tidak termasuk user DITJEN).
+// ---------------------------------------------------------------------------
+async function listUsers(session: SessionPayload) {
+  if (session.tingkat === "UPT") return forbidden();
+
+  const selectCols = "username, nama, peran, tingkat, upt_id, kanwil_id, upt:upt_id(nama), kanwil:kanwil_id(nama)";
+
+  if (session.tingkat === "DITJEN") {
+    const { data, error } = await supabase.from("users").select(selectCols).order("username");
+    if (error) return { success: false, message: error.message };
+    return { success: true, data };
+  }
+
+  // KANWIL: ambil daftar id UPT di provinsinya dulu.
+  const { data: uptRows, error: uptError } = await supabase
+    .from("upt")
+    .select("id")
+    .eq("kanwil_id", session.kanwil_id);
+  if (uptError) return { success: false, message: uptError.message };
+  const uptIds = (uptRows ?? []).map((r) => r.id as string);
+
+  const orFilter = [
+    `kanwil_id.eq.${session.kanwil_id}`,
+    uptIds.length > 0 ? `upt_id.in.(${uptIds.join(",")})` : null,
+  ].filter(Boolean).join(",");
+
+  const { data, error } = await supabase.from("users").select(selectCols).or(orFilter).order("username");
+  if (error) return { success: false, message: error.message };
+  return { success: true, data };
+}
+
+// Memastikan pemanggil (jika KANWIL) berwenang atas tingkat/unit target.
+async function canManageTargetUser(
+  session: SessionPayload,
+  tingkat: Tingkat,
+  upt_id: string | null,
+  kanwil_id: string | null,
+): Promise<boolean> {
+  if (session.tingkat === "DITJEN") return true;
+  if (session.tingkat !== "KANWIL") return false;
+  if (tingkat === "DITJEN") return false;
+  if (tingkat === "KANWIL") return kanwil_id === session.kanwil_id;
+  // tingkat === "UPT": UPT target harus berada di provinsi (kanwil) yang sama.
+  if (!upt_id) return false;
+  const { data } = await supabase.from("upt").select("kanwil_id").eq("id", upt_id).maybeSingle();
+  return !!data && data.kanwil_id === session.kanwil_id;
+}
+
+async function createUser(session: SessionPayload, payload: Record<string, unknown>) {
+  if (session.tingkat === "UPT") return forbidden();
+  const { username, password, nama, peran, tingkat, upt_id, kanwil_id } = payload as {
+    username: string; password: string; nama: string; peran: string;
+    tingkat: Tingkat; upt_id: string | null; kanwil_id: string | null;
+  };
+  if (!username || !password || !nama || !tingkat) {
+    return { success: false, message: "Username, password, nama, dan tingkat wajib diisi." };
+  }
+
+  const allowed = await canManageTargetUser(session, tingkat, upt_id ?? null, kanwil_id ?? null);
+  if (!allowed) return forbidden("Anda tidak berwenang membuat user dengan lingkup ini.");
+
+  const { error } = await supabase.from("users").insert({
+    username,
+    password_hash: hashSync(password),
+    nama,
+    peran: peran ?? "",
+    tingkat,
+    upt_id: tingkat === "UPT" ? upt_id : null,
+    kanwil_id: tingkat === "KANWIL" ? kanwil_id : null,
+  });
+  if (error) return { success: false, message: "Gagal menambah user: " + error.message };
+  return { success: true, message: "User berhasil ditambahkan." };
+}
+
+async function updateUser(session: SessionPayload, username: string, payload: Record<string, unknown>) {
+  if (session.tingkat === "UPT") return forbidden();
+
+  const { data: existing, error: findError } = await supabase
+    .from("users")
+    .select("tingkat, upt_id, kanwil_id")
+    .eq("username", username)
+    .maybeSingle();
+  if (findError || !existing) return { success: false, message: "User tidak ditemukan." };
+
+  const allowedExisting = await canManageTargetUser(session, existing.tingkat, existing.upt_id, existing.kanwil_id);
+  if (!allowedExisting) return forbidden("Anda tidak berwenang mengubah user ini.");
+
+  const { nama, peran, password, tingkat, upt_id, kanwil_id } = payload as {
+    nama?: string; peran?: string; password?: string;
+    tingkat?: Tingkat; upt_id?: string | null; kanwil_id?: string | null;
+  };
+
+  const newTingkat = tingkat ?? existing.tingkat;
+  const newUptId = newTingkat === "UPT" ? (upt_id ?? existing.upt_id) : null;
+  const newKanwilId = newTingkat === "KANWIL" ? (kanwil_id ?? existing.kanwil_id) : null;
+  const allowedNew = await canManageTargetUser(session, newTingkat, newUptId, newKanwilId);
+  if (!allowedNew) return forbidden("Anda tidak berwenang memindahkan user ke lingkup tersebut.");
+
+  const update: Record<string, unknown> = {
+    nama, peran, tingkat: newTingkat, upt_id: newUptId, kanwil_id: newKanwilId,
+  };
+  if (password) update.password_hash = hashSync(password);
+
+  const { error } = await supabase.from("users").update(update).eq("username", username);
+  if (error) return { success: false, message: "Gagal mengubah user: " + error.message };
+  return { success: true, message: "User berhasil diperbarui." };
+}
+
+async function deleteUser(session: SessionPayload, username: string) {
+  if (session.tingkat === "UPT") return forbidden();
+  if (username === session.username) return { success: false, message: "Tidak dapat menghapus akun sendiri." };
+
+  const { data: existing, error: findError } = await supabase
+    .from("users")
+    .select("tingkat, upt_id, kanwil_id")
+    .eq("username", username)
+    .maybeSingle();
+  if (findError || !existing) return { success: false, message: "User tidak ditemukan." };
+
+  const allowed = await canManageTargetUser(session, existing.tingkat, existing.upt_id, existing.kanwil_id);
+  if (!allowed) return forbidden("Anda tidak berwenang menghapus user ini.");
+
+  const { error } = await supabase.from("users").delete().eq("username", username);
+  if (error) return { success: false, message: "Gagal menghapus user: " + error.message };
+  return { success: true, message: "User berhasil dihapus." };
 }

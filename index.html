@@ -65,6 +65,18 @@
     <li class="nav-item" id="tabFormContainer">
       <button class="nav-link fw-bold text-success" id="tabFormBtn" data-bs-toggle="tab" data-bs-target="#tabForm" type="button" onclick="resetFormForNew()">➕ Asesmen Baru</button>
     </li>
+    <li class="nav-item d-none" id="tabWilayahContainer">
+      <button class="nav-link fw-bold text-dark" data-bs-toggle="tab" data-bs-target="#tabWilayah" type="button" onclick="loadKanwilList()">🏢 Kelola Wilayah</button>
+    </li>
+    <li class="nav-item d-none" id="tabUptContainer">
+      <button class="nav-link fw-bold text-dark" data-bs-toggle="tab" data-bs-target="#tabUpt" type="button" onclick="loadUptList()">🏛️ Kelola UPT</button>
+    </li>
+    <li class="nav-item d-none" id="tabUserContainer">
+      <button class="nav-link fw-bold text-dark" data-bs-toggle="tab" data-bs-target="#tabUser" type="button" onclick="loadUserList()">👤 Kelola User</button>
+    </li>
+    <li class="nav-item d-none" id="tabDitjenContainer">
+      <button class="nav-link fw-bold text-dark" data-bs-toggle="tab" data-bs-target="#tabDitjenProfile" type="button" onclick="loadDitjenProfileForm()">🏛️ Profil Ditjen</button>
+    </li>
   </ul>
 
   <div class="tab-content bg-white p-4 border border-top-0 shadow-sm">
@@ -78,7 +90,11 @@
       <div class="table-responsive">
         <table class="table table-bordered table-hover align-middle">
           <thead class="table-dark">
-            <tr><th>ID/Waktu</th><th>Asesor</th><th>No. Register</th><th>Nama Narapidana</th><th>UPT</th><th>Skor</th><th>Kategori Akhir</th><th>Aksi</th></tr>
+            <tr>
+              <th>ID/Waktu</th><th>Asesor</th><th>No. Register</th><th>Nama Narapidana</th><th>UPT</th>
+              <th class="d-none" id="thUptAsesor">UPT Asesor</th><th class="d-none" id="thKanwilAsesor">Kanwil</th>
+              <th>Skor</th><th>Kategori Akhir</th><th>Aksi</th>
+            </tr>
           </thead>
           <tbody id="dataTableBody">
             <tr><td colspan="8" class="text-center">Memuat data...</td></tr>
@@ -243,6 +259,81 @@
         </div>
       </form>
     </div>
+
+    <!-- KELOLA WILAYAH (KANWIL) -->
+    <div class="tab-pane fade" id="tabWilayah">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="m-0">Kelola Kantor Wilayah</h5>
+        <button class="btn btn-sm btn-primary d-none" id="btnTambahKanwil" onclick="openKanwilModal()">➕ Tambah Kanwil</button>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-bordered table-hover align-middle">
+          <thead class="table-dark"><tr><th>Nama Kanwil</th><th>Provinsi</th><th>Kepala Kanwil</th><th>Alamat</th><th>Aksi</th></tr></thead>
+          <tbody id="kanwilTableBody"><tr><td colspan="5" class="text-center">Memuat data...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- KELOLA UPT -->
+    <div class="tab-pane fade" id="tabUpt">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="m-0">Kelola Unit Pelaksana Teknis</h5>
+        <button class="btn btn-sm btn-primary d-none" id="btnTambahUpt" onclick="openUptModal()">➕ Tambah UPT</button>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-bordered table-hover align-middle">
+          <thead class="table-dark"><tr><th>Nama UPT</th><th>Jenis</th><th>Kanwil</th><th>Kepala UPT</th><th>Alamat</th><th>Aksi</th></tr></thead>
+          <tbody id="uptTableBody"><tr><td colspan="6" class="text-center">Memuat data...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- KELOLA USER -->
+    <div class="tab-pane fade" id="tabUser">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="m-0">Kelola User</h5>
+        <button class="btn btn-sm btn-primary" onclick="openUserModal()">➕ Tambah User</button>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-bordered table-hover align-middle">
+          <thead class="table-dark"><tr><th>Username</th><th>Nama</th><th>Peran/Jabatan</th><th>Tingkat</th><th>Unit</th><th>Aksi</th></tr></thead>
+          <tbody id="userTableBody"><tr><td colspan="6" class="text-center">Memuat data...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PROFIL DITJEN (SINGLETON) -->
+    <div class="tab-pane fade" id="tabDitjenProfile">
+      <h5 class="mb-3">Profil Direktorat Jenderal Pemasyarakatan</h5>
+      <div class="card" style="max-width: 500px;">
+        <div class="card-body">
+          <label class="form-label">Nama Instansi</label>
+          <input type="text" id="ditjen_nama" class="form-control mb-2">
+          <label class="form-label">Nama Direktur Jenderal</label>
+          <input type="text" id="ditjen_dirjen" class="form-control mb-2">
+          <label class="form-label">Alamat</label>
+          <textarea id="ditjen_alamat" class="form-control mb-3"></textarea>
+          <button class="btn btn-primary" onclick="saveDitjenProfile()">💾 Simpan Profil</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL GENERIK UNTUK KELOLA WILAYAH / UPT / USER -->
+<div class="modal fade" id="adminModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="adminModalTitle">Tambah</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="adminModalBody"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+        <button type="button" class="btn btn-primary" id="adminModalSaveBtn" onclick="adminModalSave()">Simpan</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -268,6 +359,49 @@
   let globalDataMap = {}; 
   let activeEditNoreg = null; 
 
+  // =========================================================================
+  // SESI & STRUKTUR ORGANISASI BERJENJANG (UPT / KANWIL / DITJEN)
+  // Token ditandatangani server saat login dan wajib disertakan pada setiap
+  // pemanggilan API berikutnya, supaya lingkup kewenangan tidak bisa dipalsukan.
+  // =========================================================================
+  let sessionToken = null;
+  let userTingkat = "UPT";
+  let userUptId = null;
+  let userKanwilId = null;
+
+  // Helper pemanggil API: selalu menyisipkan token sesi.
+  function callApi(action, extra) {
+    extra = extra || {};
+    return fetch(API_URL, {
+      method: 'POST', redirect: 'follow',
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(Object.assign({ action: action, token: sessionToken }, extra))
+    }).then(r => r.json());
+  }
+
+  // Menyesuaikan tab & tombol yang tampil sesuai tingkat organisasi user login.
+  // User tingkat UPT (termasuk Kepala Bapas) tidak mendapat perubahan apapun.
+  function applyStrukturOrganisasiUI() {
+    document.getElementById('thUptAsesor').classList.toggle('d-none', userTingkat === 'UPT');
+    document.getElementById('thKanwilAsesor').classList.toggle('d-none', userTingkat === 'UPT');
+
+    if (userTingkat === 'UPT') return;
+
+    // Kanwil & Ditjen hanya memantau: tab "Asesmen Baru" (input) disembunyikan.
+    document.getElementById('tabFormContainer').style.display = 'none';
+
+    if (userTingkat === 'KANWIL' || userTingkat === 'DITJEN') {
+      document.getElementById('tabUptContainer').classList.remove('d-none');
+      document.getElementById('tabUserContainer').classList.remove('d-none');
+    }
+    if (userTingkat === 'DITJEN') {
+      document.getElementById('tabWilayahContainer').classList.remove('d-none');
+      document.getElementById('tabDitjenContainer').classList.remove('d-none');
+      document.getElementById('btnTambahKanwil').classList.remove('d-none');
+      document.getElementById('btnTambahUpt').classList.remove('d-none');
+    }
+  }
+
   const list_m1 = ["1. Pakai lebih banyak", "2. Gagal berhenti", "3. Waktu tersita", "4. Craving", "5. Gagal kewajiban", "6. Masalah sosial", "7. Meninggalkan hobi", "8. Situasi bahaya", "9. Masalah fisik", "10. Toleransi dosis", "11. Gejala putus zat"];
   const list_m4a = ["A1 Padi/Sawah", "A2 Sayur/Kebun", "A3 Alat Tani", "B1 Tambak", "B2 Kapal", "B3 Olah Ikan", "C1 Mekanik", "C2 Pertukangan", "C3 Alat", "D1 Memasak", "D2 Gudang", "D3 Menjahit", "E1 Adm/Data", "E2 Laundry/Cukur", "E3 Komputer"];
   const list_m4b = ["1. Ingin berhenti.", "2. Sadar rugi.", "3. Sedia tes urin.", "4. Tdk perlu ubah(R).", "5. Mau kerja keras.", "6. Mau belajar.", "7. Sedia ikut aturan.", "8. Ikut agar bebas(R).", "9. Punya rencana.", "10. Tau hindari.", "11. Yakin bersih.", "12. Keluarga dukung."];
@@ -288,6 +422,10 @@
         if(r.success) { 
           asr = r.user.nama; 
           userJabatan = r.user.peran || ""; // field asli dari backend bernama "peran", bukan "jabatan"
+          sessionToken = r.token;
+          userTingkat = r.user.tingkat || "UPT";
+          userUptId = r.user.upt_id || null;
+          userKanwilId = r.user.kanwil_id || null;
           document.getElementById('loginSection').style.display = 'none'; 
           document.getElementById('appSection').style.display = 'block'; 
           document.getElementById('userInfo').innerText = asr; 
@@ -298,6 +436,7 @@
           }
 
           applyKunciAplikasiUI();
+          applyStrukturOrganisasiUI();
           loadDataList(); 
         }
         else { alert(r.message); btn.innerText = "Masuk"; btn.disabled = false; }
@@ -343,8 +482,7 @@
 
   function loadDataList() {
     let tbody = document.getElementById('dataTableBody'); tbody.innerHTML = `<tr><td colspan="8" class="text-center">Mengambil data dari Server...</td></tr>`;
-    fetch(API_URL, { method: 'POST', redirect: 'follow', headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "read" }) })
-    .then(r => r.json()).then(r => {
+    callApi("read").then(r => {
       if(r.success && r.data.length > 0) {
         tbody.innerHTML = ""; globalDataMap = {};
         r.data.forEach(row => {
@@ -352,16 +490,19 @@
           
           // Render Action Buttons
           let aksiHtml = `<button class="btn btn-sm btn-success" onclick="cetakData('${id}')">🖨️ PDF Full</button>`;
-          // Sembunyikan tombol Edit & Hapus jika terkunci
-          if(!KUNCI_APLIKASI) {
+          // Sembunyikan tombol Edit & Hapus jika terkunci, atau jika user bukan tingkat UPT (Kanwil/Ditjen hanya memantau)
+          if(!KUNCI_APLIKASI && userTingkat === 'UPT') {
             aksiHtml += ` <button class="btn btn-sm btn-primary" onclick="editData('${id}')">✏️ Edit</button>
                           <button class="btn btn-sm btn-danger" onclick="deleteData('${id}')">🗑️ Hapus</button>`;
           }
 
+          // Kolom "UPT Asesor"/"Kanwil" (indeks 106/107) hanya ditampilkan untuk Kanwil/Ditjen.
+          let kolomUptKanwil = userTingkat === 'UPT' ? '' : `<td>${row[106] || '-'}</td><td>${row[107] || '-'}</td>`;
+
           let tr = `<tr>
             <td><small class="text-muted">${id}</small></td>
             <td>${row[1]}</td><td>${row[3]}</td><td class="fw-bold">${row[2]}</td>
-            <td>${row[4]}</td><td><span class="badge bg-secondary">${row[102]}</span></td>
+            <td>${row[4]}</td>${kolomUptKanwil}<td><span class="badge bg-secondary">${row[102]}</span></td>
             <td><span class="badge ${row[103]==='LAYAK'?'bg-primary':row[103].includes('BERSYARAT')?'bg-warning text-dark':'bg-danger'}">${row[103]}</span></td>
             <td>${aksiHtml}</td>
           </tr>`;
@@ -510,8 +651,7 @@
     if(KUNCI_APLIKASI) return alert("Aksi ditolak: Aplikasi sedang dikunci.");
     let noreg = globalDataMap[id][3]; 
     if(!confirm("Yakin ingin menghapus data asesmen dengan No. Register: " + noreg + " ?")) return;
-    fetch(API_URL, { method: 'POST', redirect: 'follow', headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "delete", id: noreg }) })
-    .then(r => r.json()).then(r => { alert(r.message); loadDataList(); });
+    callApi("delete", { id: noreg }).then(r => { alert(r.message); loadDataList(); });
   }
 
   function editData(id) {
@@ -595,12 +735,10 @@
     for(let i=1; i<=3; i++) arr.push(document.getElementById('m4d_'+i).value);
     ['val_skorM4D','val_gt','val_kat','val_klaster','val_tpp'].forEach(id => arr.push(document.getElementById(id).value));
 
-    let payloadConfig = activeEditNoreg 
-        ? { action: "update", id: activeEditNoreg, payload: arr } 
-        : { action: "save", payload: arr };
+    let actionName = activeEditNoreg ? "update" : "save";
+    let extra = activeEditNoreg ? { id: activeEditNoreg, payload: arr } : { payload: arr };
 
-    fetch(API_URL, { method: 'POST', redirect: 'follow', headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payloadConfig) })
-    .then(r => r.json()).then(r => {
+    callApi(actionName, extra).then(r => {
       alert(r.message); 
       btn.disabled = false; 
       resetFormForNew(); 
@@ -610,6 +748,252 @@
       alert("Error: " + err);
       btn.disabled = false; btn.innerText = activeEditNoreg ? "🔄 UPDATE DATA ASESMEN" : "💾 SIMPAN DATA BARU";
     });
+  }
+
+  // =========================================================================
+  // KELOLA WILAYAH / KELOLA UPT / KELOLA USER / PROFIL DITJEN
+  // Hanya diakses oleh user tingkat KANWIL/DITJEN (tab disembunyikan untuk UPT).
+  // Satu modal generik dipakai ulang untuk ketiga jenis entitas (adminModalMode
+  // menentukan jenis form & aksi simpan yang dipanggil).
+  // =========================================================================
+  const JENIS_UPT_OPTIONS = ["Balai Pemasyarakatan", "Lembaga Pemasyarakatan", "Rumah Tahanan Negara", "Lembaga Pembinaan Khusus Anak"];
+  let kanwilCache = [];
+  let uptCache = [];
+  let adminModalMode = null; // { type: 'kanwil' | 'upt' | 'user', id }
+  let adminBsModal = null;
+  function getAdminModal() {
+    if (!adminBsModal) adminBsModal = new bootstrap.Modal(document.getElementById('adminModal'));
+    return adminBsModal;
+  }
+  function esc(v) { return (v === null || v === undefined) ? "" : String(v).replace(/"/g, '&quot;'); }
+
+  // --- KELOLA WILAYAH (KANWIL) ---
+  function loadKanwilList() {
+    let tbody = document.getElementById('kanwilTableBody');
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center">Memuat data...</td></tr>`;
+    callApi("listKanwil").then(r => {
+      if (!r.success) { tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">${r.message}</td></tr>`; return; }
+      kanwilCache = r.data || [];
+      if (kanwilCache.length === 0) { tbody.innerHTML = `<tr><td colspan="5" class="text-center">Belum ada data.</td></tr>`; return; }
+      tbody.innerHTML = kanwilCache.map(k => `<tr>
+        <td>${esc(k.nama)}</td><td>${esc(k.provinsi)}</td><td>${esc(k.kepala)}</td><td>${esc(k.alamat)}</td>
+        <td>
+          ${userTingkat === 'DITJEN' ? `<button class="btn btn-sm btn-primary" onclick="openKanwilModal('${k.id}')">✏️ Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteKanwilRow('${k.id}')">🗑️ Hapus</button>` : '-'}
+        </td>
+      </tr>`).join('');
+    });
+  }
+
+  function openKanwilModal(id) {
+    let k = id ? kanwilCache.find(x => x.id === id) : null;
+    adminModalMode = { type: 'kanwil', id: id || null };
+    document.getElementById('adminModalTitle').innerText = id ? 'Edit Kanwil' : 'Tambah Kanwil';
+    document.getElementById('adminModalBody').innerHTML = `
+      <label class="form-label">Nama Kanwil</label>
+      <input type="text" id="am_nama" class="form-control mb-2" value="${esc(k && k.nama)}">
+      <label class="form-label">Provinsi</label>
+      <input type="text" id="am_provinsi" class="form-control mb-2" value="${esc(k && k.provinsi)}">
+      <label class="form-label">Kepala Kanwil</label>
+      <input type="text" id="am_kepala" class="form-control mb-2" value="${esc(k && k.kepala)}">
+      <label class="form-label">Alamat</label>
+      <textarea id="am_alamat" class="form-control mb-2">${esc(k && k.alamat)}</textarea>`;
+    getAdminModal().show();
+  }
+
+  function deleteKanwilRow(id) {
+    if (!confirm("Yakin ingin menghapus Kanwil ini? (Pastikan tidak ada UPT yang masih terhubung)")) return;
+    callApi("deleteKanwil", { id }).then(r => { alert(r.message); loadKanwilList(); });
+  }
+
+  // --- KELOLA UPT ---
+  function loadUptList() {
+    let tbody = document.getElementById('uptTableBody');
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center">Memuat data...</td></tr>`;
+    Promise.all([callApi("listUpt"), userTingkat === 'DITJEN' ? callApi("listKanwil") : Promise.resolve({ success: true, data: kanwilCache })])
+    .then(([uptRes, kanwilRes]) => {
+      if (kanwilRes.success) kanwilCache = kanwilRes.data || [];
+      if (!uptRes.success) { tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">${uptRes.message}</td></tr>`; return; }
+      uptCache = uptRes.data || [];
+      if (uptCache.length === 0) { tbody.innerHTML = `<tr><td colspan="6" class="text-center">Belum ada data.</td></tr>`; return; }
+      tbody.innerHTML = uptCache.map(u => `<tr>
+        <td>${esc(u.nama)}</td><td>${esc(u.jenis)}</td><td>${esc(u.kanwil && u.kanwil.nama)}</td>
+        <td>${esc(u.kepala)}</td><td>${esc(u.alamat)}</td>
+        <td>
+          <button class="btn btn-sm btn-primary" onclick="openUptModal('${u.id}')">✏️ Edit</button>
+          ${userTingkat === 'DITJEN' ? `<button class="btn btn-sm btn-danger" onclick="deleteUptRow('${u.id}')">🗑️ Hapus</button>` : ''}
+        </td>
+      </tr>`).join('');
+    });
+  }
+
+  function kanwilSelectOptions(selectedId) {
+    return kanwilCache.map(k => `<option value="${k.id}" ${k.id === selectedId ? 'selected' : ''}>${esc(k.nama)}</option>`).join('');
+  }
+
+  function openUptModal(id) {
+    let u = id ? uptCache.find(x => x.id === id) : null;
+    adminModalMode = { type: 'upt', id: id || null };
+    document.getElementById('adminModalTitle').innerText = id ? 'Edit UPT' : 'Tambah UPT';
+    let kanwilId = u ? (u.kanwil_id || (u.kanwil && u.kanwil.id)) : userKanwilId;
+    document.getElementById('adminModalBody').innerHTML = `
+      <label class="form-label">Kanwil</label>
+      <select id="am_kanwil_id" class="form-select mb-2" ${userTingkat === 'KANWIL' ? 'disabled' : ''}>${kanwilSelectOptions(kanwilId)}</select>
+      <label class="form-label">Nama UPT</label>
+      <input type="text" id="am_nama" class="form-control mb-2" value="${esc(u && u.nama)}">
+      <label class="form-label">Jenis</label>
+      <select id="am_jenis" class="form-select mb-2">${JENIS_UPT_OPTIONS.map(j => `<option ${u && u.jenis === j ? 'selected' : ''}>${j}</option>`).join('')}</select>
+      <label class="form-label">Kepala UPT</label>
+      <input type="text" id="am_kepala" class="form-control mb-2" value="${esc(u && u.kepala)}">
+      <label class="form-label">Alamat</label>
+      <textarea id="am_alamat" class="form-control mb-2">${esc(u && u.alamat)}</textarea>`;
+    getAdminModal().show();
+  }
+
+  function deleteUptRow(id) {
+    if (!confirm("Yakin ingin menghapus UPT ini? (Pastikan tidak ada user/data asesmen yang masih terhubung)")) return;
+    callApi("deleteUpt", { id }).then(r => { alert(r.message); loadUptList(); });
+  }
+
+  // --- KELOLA USER ---
+  function loadUserList() {
+    let tbody = document.getElementById('userTableBody');
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center">Memuat data...</td></tr>`;
+    Promise.all([callApi("listUsers"), callApi("listUpt"), userTingkat === 'DITJEN' ? callApi("listKanwil") : Promise.resolve({ success: true, data: kanwilCache })])
+    .then(([userRes, uptRes, kanwilRes]) => {
+      if (uptRes.success) uptCache = uptRes.data || [];
+      if (kanwilRes.success) kanwilCache = kanwilRes.data || [];
+      if (!userRes.success) { tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">${userRes.message}</td></tr>`; return; }
+      let users = userRes.data || [];
+      if (users.length === 0) { tbody.innerHTML = `<tr><td colspan="6" class="text-center">Belum ada data.</td></tr>`; return; }
+      tbody.innerHTML = users.map(u => `<tr>
+        <td>${esc(u.username)}</td><td>${esc(u.nama)}</td><td>${esc(u.peran)}</td><td>${esc(u.tingkat)}</td>
+        <td>${esc((u.upt && u.upt.nama) || (u.kanwil && u.kanwil.nama) || '-')}</td>
+        <td>
+          <button class="btn btn-sm btn-primary" onclick="openUserModal('${u.username}')">✏️ Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteUserRow('${u.username}')">🗑️ Hapus</button>
+        </td>
+      </tr>`).join('');
+    });
+  }
+
+  function uptSelectOptions(selectedId) {
+    return uptCache.map(u => `<option value="${u.id}" ${u.id === selectedId ? 'selected' : ''}>${esc(u.nama)}</option>`).join('');
+  }
+
+  function renderUnitFieldByTingkat(tingkat, uptId, kanwilId) {
+    if (tingkat === 'KANWIL') {
+      return `<label class="form-label">Kanwil</label><select id="am_kanwil_id" class="form-select mb-2" ${userTingkat === 'KANWIL' ? 'disabled' : ''}>${kanwilSelectOptions(kanwilId || userKanwilId)}</select>`;
+    }
+    if (tingkat === 'UPT') {
+      return `<label class="form-label">UPT</label><select id="am_upt_id" class="form-select mb-2">${uptSelectOptions(uptId)}</select>`;
+    }
+    return '';
+  }
+
+  function openUserModal(username) {
+    adminModalMode = { type: 'user', id: username || null };
+    document.getElementById('adminModalTitle').innerText = username ? 'Edit User' : 'Tambah User';
+
+    callApi("listUsers").then(r => {
+      let u = username && r.success ? (r.data || []).find(x => x.username === username) : null;
+      let tingkatAwal = (u && u.tingkat) || 'UPT';
+      let tingkatOptions = ['UPT', 'KANWIL'].concat(userTingkat === 'DITJEN' ? ['DITJEN'] : []);
+      document.getElementById('adminModalBody').innerHTML = `
+        <label class="form-label">Username</label>
+        <input type="text" id="am_username" class="form-control mb-2" value="${esc(username)}" ${username ? 'disabled' : ''}>
+        <label class="form-label">Password ${username ? '(kosongkan jika tidak diubah)' : ''}</label>
+        <input type="password" id="am_password" class="form-control mb-2">
+        <label class="form-label">Nama</label>
+        <input type="text" id="am_nama" class="form-control mb-2" value="${esc(u && u.nama)}">
+        <label class="form-label">Peran/Jabatan</label>
+        <input type="text" id="am_peran" class="form-control mb-2" value="${esc(u && u.peran)}">
+        <label class="form-label">Tingkat</label>
+        <select id="am_tingkat" class="form-select mb-2" onchange="document.getElementById('am_unit_container').innerHTML = renderUnitFieldByTingkat(this.value, null, null)">
+          ${tingkatOptions.map(t => `<option value="${t}" ${tingkatAwal === t ? 'selected' : ''}>${t}</option>`).join('')}
+        </select>
+        <div id="am_unit_container">${renderUnitFieldByTingkat(tingkatAwal, u && u.upt_id, u && u.kanwil_id)}</div>`;
+      getAdminModal().show();
+    });
+  }
+
+  function deleteUserRow(username) {
+    if (!confirm(`Yakin ingin menghapus user "${username}"?`)) return;
+    callApi("deleteUser", { username }).then(r => { alert(r.message); loadUserList(); });
+  }
+
+  // --- PROFIL DITJEN (SINGLETON) ---
+  function loadDitjenProfileForm() {
+    callApi("getDitjenProfile").then(r => {
+      if (!r.success) return alert(r.message);
+      document.getElementById('ditjen_nama').value = r.data.nama || '';
+      document.getElementById('ditjen_dirjen').value = r.data.dirjen || '';
+      document.getElementById('ditjen_alamat').value = r.data.alamat || '';
+    });
+  }
+
+  function saveDitjenProfile() {
+    let payload = {
+      nama: document.getElementById('ditjen_nama').value,
+      dirjen: document.getElementById('ditjen_dirjen').value,
+      alamat: document.getElementById('ditjen_alamat').value,
+    };
+    callApi("updateDitjenProfile", { payload }).then(r => alert(r.message));
+  }
+
+  // --- SIMPAN MODAL GENERIK (dispatch sesuai adminModalMode.type) ---
+  function adminModalSave() {
+    if (!adminModalMode) return;
+    let type = adminModalMode.type, id = adminModalMode.id;
+
+    if (type === 'kanwil') {
+      let payload = {
+        nama: document.getElementById('am_nama').value,
+        provinsi: document.getElementById('am_provinsi').value,
+        kepala: document.getElementById('am_kepala').value,
+        alamat: document.getElementById('am_alamat').value,
+      };
+      let p = id ? callApi("updateKanwil", { id, payload }) : callApi("createKanwil", { payload });
+      p.then(r => { alert(r.message); if (r.success) { getAdminModal().hide(); loadKanwilList(); } });
+      return;
+    }
+
+    if (type === 'upt') {
+      let payload = {
+        kanwil_id: document.getElementById('am_kanwil_id').value,
+        nama: document.getElementById('am_nama').value,
+        jenis: document.getElementById('am_jenis').value,
+        kepala: document.getElementById('am_kepala').value,
+        alamat: document.getElementById('am_alamat').value,
+      };
+      let p = id ? callApi("updateUpt", { id, payload }) : callApi("createUpt", { payload });
+      p.then(r => { alert(r.message); if (r.success) { getAdminModal().hide(); loadUptList(); } });
+      return;
+    }
+
+    if (type === 'user') {
+      let tingkat = document.getElementById('am_tingkat').value;
+      let payload = {
+        nama: document.getElementById('am_nama').value,
+        peran: document.getElementById('am_peran').value,
+        tingkat: tingkat,
+        upt_id: tingkat === 'UPT' ? (document.getElementById('am_upt_id') ? document.getElementById('am_upt_id').value : null) : null,
+        kanwil_id: tingkat === 'KANWIL' ? (document.getElementById('am_kanwil_id') ? document.getElementById('am_kanwil_id').value : null) : null,
+      };
+      let password = document.getElementById('am_password').value;
+      if (password) payload.password = password;
+
+      let p;
+      if (id) {
+        p = callApi("updateUser", { username: id, payload });
+      } else {
+        payload.username = document.getElementById('am_username').value;
+        if (!payload.username || !password) { alert("Username dan password wajib diisi untuk user baru."); return; }
+        p = callApi("createUser", { payload });
+      }
+      p.then(r => { alert(r.message); if (r.success) { getAdminModal().hide(); loadUserList(); } });
+      return;
+    }
   }
 </script>
 </body>
