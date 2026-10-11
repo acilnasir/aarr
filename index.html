@@ -12,13 +12,29 @@
     .section-title { background: #0D3B66; color: white; padding: 8px 15px; border-radius: 4px; margin-top: 25px; }
     .table-radio td { text-align: center; vertical-align: middle; }
     .table-radio th { font-size: 0.9rem; }
-    #pdfHiddenArea { position: absolute; left: -9999px; top: -9999px; width: 800px; background: #fff; }
+    #pdfPreviewBody { background: #6c757d; padding: 16px; overflow: auto; }
+    #pdfPaper { background: #fff; width: 760px; max-width: 100%; margin: 0 auto; box-shadow: 0 0 8px rgba(0,0,0,.5); }
   </style>
 </head>
 <body class="bg-light">
 
-<!-- AREA RENDER PDF -->
-<div id="pdfHiddenArea"><div id="pdfContent"></div></div>
+<!-- PRATINJAU PDF -->
+<div class="modal fade" id="pdfPreviewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Pratinjau Asesmen IKP-R</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0" id="pdfPreviewBody"><div id="pdfPaper"></div></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+        <button type="button" class="btn btn-outline-primary" onclick="printPreview()">🖨️ Cetak ke Printer</button>
+        <button type="button" class="btn btn-success" id="btnDownloadPdf" onclick="downloadPreviewPdf()">⬇️ Download PDF</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- DIV LOGIN -->
 <div class="container py-5" id="loginSection" style="max-width: 400px;">
@@ -635,16 +651,43 @@
     </div>
     `;
 
-    document.getElementById('pdfContent').innerHTML = html;
-    let element = document.getElementById('pdfContent');
-    let opt = {
+    currentPdfFilename = 'Asesmen_IKPR_' + d[3] + '_' + d[2] + '.pdf';
+    document.getElementById('pdfPaper').innerHTML = html;
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('pdfPreviewModal')).show();
+  }
+
+  let currentPdfFilename = 'Asesmen_IKPR.pdf';
+
+  function downloadPreviewPdf() {
+    const btn = document.getElementById('btnDownloadPdf');
+    btn.disabled = true; btn.innerText = "Membuat PDF...";
+    const body = document.getElementById('pdfPreviewBody');
+    const prevScroll = body.scrollTop; body.scrollTop = 0;
+    const opt = {
       margin:       10,
-      filename:     'Asesmen_IKPR_' + d[3] + '_' + d[2] + '.pdf',
+      filename:     currentPdfFilename,
       image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true },
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      html2canvas:  { scale: 2, useCORS: true, scrollX: 0, scrollY: 0, backgroundColor: '#ffffff' },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak:    { mode: ['css', 'legacy'], avoid: 'tr' }
     };
-    html2pdf().set(opt).from(element).save();
+    html2pdf().set(opt).from(document.getElementById('pdfPaper')).save()
+      .catch(err => alert("Gagal membuat PDF: " + err))
+      .finally(() => { body.scrollTop = prevScroll; btn.disabled = false; btn.innerText = "⬇️ Download PDF"; });
+  }
+
+  function printPreview() {
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+    document.body.appendChild(iframe);
+    const doc = iframe.contentWindow.document;
+    doc.open();
+    doc.write('<html><head><title>' + currentPdfFilename.replace('.pdf', '') + '</title><style>@page{size:A4;margin:10mm;} body{margin:0;} .html2pdf__page-break{page-break-after:always;} tr{page-break-inside:avoid;}</style></head><body>' + document.getElementById('pdfPaper').innerHTML + '</body></html>');
+    doc.close();
+    let printed = false;
+    const go = () => { if (printed) return; printed = true; iframe.contentWindow.focus(); iframe.contentWindow.print(); setTimeout(() => iframe.remove(), 2000); };
+    iframe.onload = go;
+    setTimeout(go, 500);
   }
 
   function deleteData(id) {
