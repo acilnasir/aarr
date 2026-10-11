@@ -205,3 +205,10 @@ tidak mendapat perubahan tampilan apapun.**
 
 - `exportAsesmen`: seluruh hasil asesmen (sesuai lingkup) untuk pimpinan saja — Kepala Bapas (UPT), Kepala Kanwil, Dirjen/Admin Ditjen. Frontend mengunduh CSV (UTF-8, terbuka di Excel).
 - Tombol "Buat Laporan" (semua user): pratinjau PDF landscape dari data yang sedang difilter (skor, kategori, klaster, keputusan TPP).
+
+## Wilayah kerja Bapas & asesmen kolaboratif (migrasi 0006)
+
+- Tabel `bapas_wilayah_kerja` (bapas_id -> upt_id): Lapas/Rutan/LPKA yang menjadi wilayah kerja tiap Bapas, dalam provinsi (Kanwil) yang sama. Dikelola lewat tab "Wilayah Kerja Bapas" (`listWilayahKerja`, `setWilayahKerja`) oleh Kepala Bapas (Bapas sendiri), Kanwil (provinsinya), dan Ditjen.
+- `hasil_asesmen.upt_id` = UPT tempat WBP berada; kolom baru `asesor_upt_id` = UPT asal asesor bila berbeda (mis. Bapas). Data terlihat dan dapat diedit/dihapus oleh kedua UPT.
+- Wali, tenaga kesehatan, dan asesor dapat saling mengedit. Wali/nakes harus pegawai UPT lokasi WBP; asesor dari UPT lokasi atau Bapas yang mencakup wilayahnya. User Bapas memilih lokasi WBP (`lokasi_upt_id`) saat input (`getLokasiAsesmen`).
+- Blok pengesahan PDF: Wali (kiri), Tenaga Kesehatan (tengah), Asesor (kanan).

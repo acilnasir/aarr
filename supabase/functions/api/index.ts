@@ -139,7 +139,7 @@ serve(async (req: Request) => {
     switch (action) {
       // --- Data asesmen (dibatasi lingkup organisasi) ---
       case "save":
-        result = await saveDataAsesmen(session, body.payload, body.wali, body.nakes);
+        result = await saveDataAsesmen(session, body.payload, body);
         break;
       case "read":
         result = await readDataAsesmen(session);
@@ -150,7 +150,7 @@ serve(async (req: Request) => {
           : forbidden("Hanya pimpinan yang dapat mengekspor data.");
         break;
       case "update":
-        result = await updateDataAsesmen(session, body.id, body.payload, body.wali, body.nakes);
+        result = await updateDataAsesmen(session, body.id, body.payload, body);
         break;
       case "delete":
         result = await deleteDataAsesmen(session, body.id);
@@ -164,7 +164,16 @@ serve(async (req: Request) => {
         result = await saveMySignature(session, body.image);
         break;
       case "listPenandatangan":
-        result = await listPenandatangan(session);
+        result = await listPenandatangan(session, body.upt_id);
+        break;
+      case "listWilayahKerja":
+        result = await listWilayahKerja(session);
+        break;
+      case "setWilayahKerja":
+        result = await setWilayahKerja(session, body.bapas_id, body.upt_ids);
+        break;
+      case "getLokasiAsesmen":
+        result = await getLokasiAsesmen(session);
         break;
       case "getPengesahan":
         result = await getPengesahan(session, body.id);
@@ -354,11 +363,118 @@ function extractNoRegister(payload: unknown[]): string {
   return String(payload[2] ?? "").trim();
 }
 
-async function saveDataAsesmen(session: SessionPayload, payload: unknown[], wali?: string, nakes?: string) {
+const JENIS_BAPAS = "Balai Pemasyarakatan";
+
+type UptRow = { id: string; nama: string; jenis: string; kanwil_id: string };
+
+async function getUptRow(id: string | null | undefined): Promise<UptRow | null> {
+  if (!id) return null;
+  const { data } = await supabase.from("upt").select("id, nama, jenis, kanwil_id").eq("id", id).maybeSingle();
+  return (data as UptRow | null) ?? null;
+}
+
+// Wilayah kerja (Lapas/Rutan/LPKA) dari sebuah Bapas.
+async function wilayahKerjaOf(bapasId: string): Promise<UptRow[]> {
+  const { data } = await supabase
+    .from("bapas_wilayah_kerja")
+    .select("upt:upt_id(id, nama, jenis, kanwil_id)")
+    .eq("bapas_id", bapasId);
+  // deno-lint-ignore no-explicit-any
+  return ((data ?? []) as any[]).map((r) => r.upt).filter(Boolean);
+}
+
+// Bapas yang wilayah kerjanya mencakup UPT tertentu.
+async function coveringBapas(uptId: string): Promise<UptRow[]> {
+  const { data } = await supabase
+    .from("bapas_wilayah_kerja")
+    .select("bapas:bapas_id(id, nama, jenis, kanwil_id)")
+    .eq("upt_id", uptId);
+  // deno-lint-ignore no-explicit-any
+  return ((data ?? []) as any[]).map((r) => r.bapas).filter(Boolean);
+}
+
+// Lokasi (UPT tempat WBP berada) yang boleh dipilih pemanggil: UPT sendiri,
+// ditambah wilayah kerja bila pemanggil berada di Bapas.
+async function lokasiAsesmenOptions(session: SessionPayload) {
+  const own = await getUptRow(session.upt_id);
+  if (!own) return { own: null, is_bapas: false, wilayah: [] as UptRow[] };
+  const isBapas = own.jenis === JENIS_BAPAS;
+  return { own, is_bapas: isBapas, wilayah: isBapas ? await wilayahKerjaOf(own.id) : [] };
+}
+
+async function getLokasiAsesmen(session: SessionPayload) {
+  if (session.tingkat !== "UPT") return forbidden();
+  const o = await lokasiAsesmenOptions(session);
+  return { success: true, own: o.own, is_bapas: o.is_bapas, wilayah: o.wilayah };
+}
+
+// Pemanggil boleh menginput/mengedit/menghapus bila UPT-nya adalah pemilik
+// data (lokasi WBP) atau UPT asal asesor.
+function canEditRecord(session: SessionPayload, rec: { upt_id: string; asesor_upt_id?: string | null }): boolean {
+  if (session.tingkat !== "UPT" || !session.upt_id) return false;
+  return rec.upt_id === session.upt_id || rec.asesor_upt_id === session.upt_id;
+}
+
+// Wali/nakes harus pegawai UPT tempat WBP berada; asesor boleh dari UPT itu
+// atau dari Bapas yang wilayah kerjanya mencakup UPT tersebut.
+async function validateSigners(
+  uptId: string,
+  s: { wali?: string | null; nakes?: string | null; asesor?: string | null },
+): Promise<{ ok: true; asesorUptId: string | null } | { ok: false; message: string }> {
+  const userUpt = async (username: string) => {
+    const { data } = await supabase.from("users").select("upt_id").eq("username", username).maybeSingle();
+    return (data?.upt_id as string | null | undefined) ?? undefined;
+  };
+  for (const [label, u] of [["Wali", s.wali], ["Tenaga kesehatan", s.nakes]] as const) {
+    if (u && (await userUpt(u)) !== uptId) {
+      return { ok: false, message: `${label} harus pegawai UPT tempat WBP berada.` };
+    }
+  }
+  let asesorUptId: string | null = null;
+  if (s.asesor) {
+    const au = await userUpt(s.asesor);
+    if (!au) return { ok: false, message: "Asesor tidak ditemukan." };
+    if (au !== uptId) {
+      const bapasIds = (await coveringBapas(uptId)).map((b) => b.id);
+      if (!bapasIds.includes(au)) {
+        return { ok: false, message: "Asesor harus dari UPT tempat WBP berada atau Bapas yang mencakup wilayah kerjanya." };
+      }
+      asesorUptId = au;
+    }
+  }
+  return { ok: true, asesorUptId };
+}
+
+type SaveExtra = { wali?: string; nakes?: string; asesor?: string; lokasi_upt_id?: string };
+
+async function saveDataAsesmen(session: SessionPayload, payload: unknown[], extra: SaveExtra) {
   if (session.tingkat !== "UPT") {
     return forbidden("Hanya user tingkat UPT yang dapat menginput data asesmen.");
   }
   if ((await lockStatus(session)).locked) return forbidden("Aplikasi sedang dikunci.");
+
+  // Lokasi WBP: UPT sendiri, atau (untuk user Bapas) salah satu wilayah kerjanya.
+  let uptId = session.upt_id;
+  if (extra.lokasi_upt_id && extra.lokasi_upt_id !== session.upt_id) {
+    const o = await lokasiAsesmenOptions(session);
+    if (!o.wilayah.some((w) => w.id === extra.lokasi_upt_id)) {
+      return forbidden("Lokasi tersebut bukan wilayah kerja Bapas Anda.");
+    }
+    uptId = extra.lokasi_upt_id;
+  }
+  if (!uptId) return forbidden();
+
+  const asesorUsername = extra.asesor || session.username;
+  const check = await validateSigners(uptId, {
+    wali: extra.wali, nakes: extra.nakes,
+    asesor: asesorUsername === session.username && uptId === session.upt_id ? null : asesorUsername,
+  });
+  if (!check.ok) return { success: false, message: check.message };
+  // Asesor yang bukan dari UPT pemilik (mis. dari Bapas): catat UPT asalnya.
+  const asesorUptId = uptId !== session.upt_id && asesorUsername === session.username
+    ? session.upt_id
+    : check.asesorUptId;
+
   const id = nowJakartaTimestamp();
   const noRegister = extractNoRegister(payload);
 
@@ -366,10 +482,11 @@ async function saveDataAsesmen(session: SessionPayload, payload: unknown[], wali
     id,
     no_register: noRegister,
     payload,
-    upt_id: session.upt_id, // selalu diisi dari sesi, bukan dari client
-    asesor_username: session.username,
-    wali_username: wali || null,
-    nakes_username: nakes || null,
+    upt_id: uptId, // selalu divalidasi dari sesi, bukan dipercaya dari client
+    asesor_upt_id: asesorUptId,
+    asesor_username: asesorUsername,
+    wali_username: extra.wali || null,
+    nakes_username: extra.nakes || null,
   });
 
   if (error) {
@@ -401,10 +518,11 @@ async function readDataAsesmen(session: SessionPayload) {
 
   let query = supabase
     .from("hasil_asesmen")
-    .select("id, payload, upt_id, wali_username, nakes_username, updated_at, upt:upt_id(nama, kanwil:kanwil_id(nama))")
+    .select("id, payload, upt_id, asesor_username, wali_username, nakes_username, updated_at, upt:upt_id(nama, kanwil:kanwil_id(nama))")
     .order("created_at", { ascending: false });
   if (uptIds !== null) {
-    query = query.in("upt_id", uptIds);
+    // Termasuk data yang diasesmen oleh UPT asal asesor (mis. Bapas).
+    query = query.or(`upt_id.in.(${uptIds.join(",")}),asesor_upt_id.in.(${uptIds.join(",")})`);
   }
 
   const { data, error } = await query;
@@ -424,11 +542,13 @@ async function readDataAsesmen(session: SessionPayload) {
     row.wali_username ?? "",
     row.nakes_username ?? "",
     row.updated_at ?? "",
+    row.asesor_username ?? "",
+    row.upt_id ?? "",
   ]);
   return { success: true, data: records };
 }
 
-async function updateDataAsesmen(session: SessionPayload, idNoreg: string, payload: unknown[], wali?: string, nakes?: string) {
+async function updateDataAsesmen(session: SessionPayload, idNoreg: string, payload: unknown[], extra: SaveExtra) {
   if (session.tingkat !== "UPT") {
     return forbidden("Hanya user tingkat UPT yang dapat mengubah data asesmen.");
   }
@@ -438,20 +558,35 @@ async function updateDataAsesmen(session: SessionPayload, idNoreg: string, paylo
 
   const { data: existing, error: findError } = await supabase
     .from("hasil_asesmen")
-    .select("id, upt_id")
+    .select("id, upt_id, asesor_upt_id, asesor_username, wali_username, nakes_username")
     .eq("no_register", target)
     .maybeSingle();
 
   if (findError || !existing) {
     return { success: false, message: "Gagal update. No. Register tidak ditemukan di database." };
   }
-  if (existing.upt_id !== session.upt_id) {
+  if (!canEditRecord(session, existing)) {
     return forbidden("Data ini bukan milik UPT Anda.");
   }
 
+  // Wali, nakes, dan asesor saling dapat mengedit; hanya validasi penandatangan yang berubah.
+  const wali = extra.wali || null;
+  const nakes = extra.nakes || null;
+  const asesor = extra.asesor || existing.asesor_username || null;
+  const check = await validateSigners(existing.upt_id, {
+    wali: wali !== existing.wali_username ? wali : null,
+    nakes: nakes !== existing.nakes_username ? nakes : null,
+    asesor: asesor !== existing.asesor_username ? asesor : null,
+  });
+  if (!check.ok) return { success: false, message: check.message };
+  const changes: Record<string, unknown> = {
+    no_register: newNoRegister, payload, wali_username: wali, nakes_username: nakes, asesor_username: asesor,
+  };
+  if (asesor !== existing.asesor_username) changes.asesor_upt_id = check.asesorUptId;
+
   const { error: updateError } = await supabase
     .from("hasil_asesmen")
-    .update({ no_register: newNoRegister, payload, wali_username: wali || null, nakes_username: nakes || null })
+    .update(changes)
     .eq("id", existing.id);
 
   if (updateError) {
@@ -469,14 +604,14 @@ async function deleteDataAsesmen(session: SessionPayload, idNoreg: string) {
 
   const { data: existing, error: findError } = await supabase
     .from("hasil_asesmen")
-    .select("id, upt_id")
+    .select("id, upt_id, asesor_upt_id")
     .eq("no_register", target)
     .maybeSingle();
 
   if (findError || !existing) {
     return { success: false, message: "Gagal hapus. No. Register tidak ditemukan." };
   }
-  if (existing.upt_id !== session.upt_id) {
+  if (!canEditRecord(session, existing)) {
     return forbidden("Data ini bukan milik UPT Anda.");
   }
 
@@ -527,26 +662,37 @@ async function saveMySignature(session: SessionPayload, image: unknown) {
   return { success: true, message: image ? "Tanda tangan berhasil disimpan." : "Tanda tangan dihapus." };
 }
 
-// Daftar user pada UPT pemanggil yang bisa dipilih sebagai wali / tenaga kesehatan.
-async function listPenandatangan(session: SessionPayload) {
+// Daftar calon penandatangan untuk UPT lokasi WBP (default: UPT pemanggil).
+// wali & nakes = pegawai UPT lokasi; asesor = pegawai UPT lokasi + Bapas yang mencakup wilayahnya.
+async function listPenandatangan(session: SessionPayload, lokasiUptId?: string) {
   if (session.tingkat !== "UPT" || !session.upt_id) return forbidden();
+  let uptId = session.upt_id;
+  if (lokasiUptId && lokasiUptId !== session.upt_id) {
+    const o = await lokasiAsesmenOptions(session);
+    if (!o.wilayah.some((w) => w.id === lokasiUptId)) {
+      // Boleh juga untuk data yang sudah ada milik UPT lain yang melibatkan UPT pemanggil.
+      const bapas = (await coveringBapas(lokasiUptId)).map((b) => b.id);
+      if (!bapas.includes(session.upt_id)) return forbidden();
+    }
+    uptId = lokasiUptId;
+  }
+  const uptIds = [uptId, ...(await coveringBapas(uptId)).map((b) => b.id)];
   const { data, error } = await supabase
     .from("users")
-    .select("username, nama, peran, tanda_tangan")
-    .eq("upt_id", session.upt_id)
+    .select("username, nama, peran, upt_id, tanda_tangan, upt:upt_id(nama)")
+    .in("upt_id", uptIds)
     .order("nama");
   if (error) return { success: false, message: error.message };
   // deno-lint-ignore no-explicit-any
-  return {
-    success: true,
-    // deno-lint-ignore no-explicit-any
-    data: (data ?? []).map((u: any) => ({
-      username: u.username,
-      nama: u.nama,
-      peran: u.peran,
-      has_ttd: !!u.tanda_tangan,
-    })),
-  };
+  const rows = (data ?? []).map((u: any) => ({
+    username: u.username,
+    nama: u.nama,
+    peran: u.peran,
+    upt_id: u.upt_id,
+    upt_nama: u.upt?.nama ?? "",
+    has_ttd: !!u.tanda_tangan,
+  }));
+  return { success: true, data: rows.filter((u) => u.upt_id === uptId), asesor: rows };
 }
 
 // Data pengesahan (nama + gambar tanda tangan) untuk satu asesmen, dengan
@@ -554,13 +700,15 @@ async function listPenandatangan(session: SessionPayload) {
 async function getPengesahan(session: SessionPayload, idNoreg: string) {
   const { data: rec, error } = await supabase
     .from("hasil_asesmen")
-    .select("upt_id, payload, asesor_username, wali_username, nakes_username")
+    .select("upt_id, asesor_upt_id, payload, asesor_username, wali_username, nakes_username")
     .eq("no_register", String(idNoreg).trim())
     .maybeSingle();
   if (error || !rec) return { success: false, message: "Data asesmen tidak ditemukan." };
 
   const uptIds = await scopedUptIds(session);
-  if (uptIds !== null && !uptIds.includes(rec.upt_id)) return forbidden();
+  if (uptIds !== null && !uptIds.includes(rec.upt_id) && !(rec.asesor_upt_id && uptIds.includes(rec.asesor_upt_id))) {
+    return forbidden();
+  }
 
   const fetchUser = async (username: string | null) => {
     if (!username) return null;
@@ -579,7 +727,7 @@ async function getPengesahan(session: SessionPayload, idNoreg: string) {
     const { data } = await supabase
       .from("users")
       .select("username, nama, peran, tanda_tangan")
-      .eq("upt_id", rec.upt_id)
+      .in("upt_id", [rec.upt_id, rec.asesor_upt_id].filter(Boolean))
       .eq("nama", nama)
       .maybeSingle();
     asesor = data ?? null;
@@ -725,7 +873,7 @@ async function getStatistik(session: SessionPayload, kanwilFilter?: string, uptF
       const { data, error } = await supabase
         .from("hasil_asesmen")
         .select("payload, created_at, updated_at, upt_id")
-        .in("upt_id", uptIds)
+        .or(`upt_id.in.(${uptIds.join(",")}),asesor_upt_id.in.(${uptIds.join(",")})`)
         .order("created_at")
         .range(from, from + PAGE - 1);
       if (error) return { success: false, message: error.message };
@@ -798,6 +946,111 @@ async function getStatistik(session: SessionPayload, kanwilFilter?: string, uptF
     });
   }
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// Wilayah kerja Bapas -- referensi Lapas/Rutan/LPKA yang dicakup tiap Bapas.
+//   DITJEN: semua Bapas. KANWIL: Bapas di provinsinya. Kepala Bapas: Bapas sendiri.
+//   User UPT lain hanya melihat (Bapas sendiri / Bapas yang mencakup UPT-nya).
+// ---------------------------------------------------------------------------
+function canManageBapas(session: SessionPayload, bapas: UptRow): boolean {
+  if (bapas.jenis !== JENIS_BAPAS) return false;
+  if (session.tingkat === "DITJEN") return true;
+  if (session.tingkat === "KANWIL") return bapas.kanwil_id === session.kanwil_id;
+  return isKepalaBapas(session) && session.upt_id === bapas.id;
+}
+
+async function listWilayahKerja(session: SessionPayload) {
+  const { data: all, error } = await supabase
+    .from("upt")
+    .select("id, nama, jenis, kanwil_id, kanwil:kanwil_id(nama)")
+    .order("nama");
+  if (error) return { success: false, message: error.message };
+  // deno-lint-ignore no-explicit-any
+  const upts = (all ?? []) as any[];
+
+  const { data: rows } = await supabase.from("bapas_wilayah_kerja").select("bapas_id, upt_id");
+  const byBapas = new Map<string, string[]>();
+  for (const r of rows ?? []) {
+    const arr = byBapas.get(r.bapas_id) ?? [];
+    arr.push(r.upt_id);
+    byBapas.set(r.bapas_id, arr);
+  }
+
+  const own = session.tingkat === "UPT" ? upts.find((u) => u.id === session.upt_id) : null;
+  const inScope = (u: { id: string; kanwil_id: string }) => {
+    if (session.tingkat === "DITJEN") return true;
+    if (session.tingkat === "KANWIL") return u.kanwil_id === session.kanwil_id;
+    return !!own && u.kanwil_id === own.kanwil_id;
+  };
+  const uptById = new Map(upts.map((u) => [u.id as string, u]));
+
+  const bapasList = upts
+    .filter((u) => u.jenis === JENIS_BAPAS && inScope(u))
+    .filter((u) => {
+      if (session.tingkat !== "UPT") return true;
+      // User UPT: Bapas sendiri atau Bapas yang mencakup UPT-nya.
+      return u.id === session.upt_id || (byBapas.get(u.id) ?? []).includes(session.upt_id as string);
+    })
+    .map((u) => ({
+      id: u.id,
+      nama: u.nama,
+      kanwil_id: u.kanwil_id,
+      kanwil_nama: u.kanwil?.nama ?? "",
+      can_manage: canManageBapas(session, u),
+      wilayah: (byBapas.get(u.id) ?? [])
+        .map((id) => uptById.get(id))
+        .filter(Boolean)
+        // deno-lint-ignore no-explicit-any
+        .map((w: any) => ({ id: w.id, nama: w.nama, jenis: w.jenis })),
+    }));
+
+  const kandidat = upts
+    .filter((u) => u.jenis !== JENIS_BAPAS && inScope(u))
+    .map((u) => ({ id: u.id, nama: u.nama, jenis: u.jenis, kanwil_id: u.kanwil_id }));
+
+  return { success: true, bapas: bapasList, kandidat };
+}
+
+async function setWilayahKerja(session: SessionPayload, bapasId: string, uptIds: unknown) {
+  const bapas = await getUptRow(bapasId);
+  if (!bapas || bapas.jenis !== JENIS_BAPAS) return { success: false, message: "Bapas tidak ditemukan." };
+  if (!canManageBapas(session, bapas)) return forbidden("Anda tidak berwenang mengubah wilayah kerja Bapas ini.");
+  if (!Array.isArray(uptIds)) return { success: false, message: "Daftar UPT tidak valid." };
+
+  const wanted = [...new Set(uptIds.map(String))];
+  if (wanted.length > 0) {
+    const { data } = await supabase.from("upt").select("id, jenis, kanwil_id").in("id", wanted);
+    const found = data ?? [];
+    if (found.length !== wanted.length) return { success: false, message: "Ada UPT yang tidak ditemukan." };
+    if (found.some((u) => u.jenis === JENIS_BAPAS)) {
+      return { success: false, message: "Wilayah kerja hanya berisi Lapas/Rutan/LPKA." };
+    }
+    if (found.some((u) => u.kanwil_id !== bapas.kanwil_id)) {
+      return { success: false, message: "UPT harus berada dalam provinsi (Kanwil) yang sama dengan Bapas." };
+    }
+  }
+
+  const { data: cur } = await supabase.from("bapas_wilayah_kerja").select("upt_id").eq("bapas_id", bapasId);
+  const current = (cur ?? []).map((r) => r.upt_id as string);
+  const toAdd = wanted.filter((id) => !current.includes(id));
+  const toRemove = current.filter((id) => !wanted.includes(id));
+
+  if (toAdd.length > 0) {
+    const { error } = await supabase
+      .from("bapas_wilayah_kerja")
+      .insert(toAdd.map((upt_id) => ({ bapas_id: bapasId, upt_id })));
+    if (error) return { success: false, message: "Gagal menyimpan: " + error.message };
+  }
+  if (toRemove.length > 0) {
+    const { error } = await supabase
+      .from("bapas_wilayah_kerja")
+      .delete()
+      .eq("bapas_id", bapasId)
+      .in("upt_id", toRemove);
+    if (error) return { success: false, message: "Gagal menyimpan: " + error.message };
+  }
+  return { success: true, message: "Wilayah kerja Bapas berhasil disimpan." };
 }
 
 // ---------------------------------------------------------------------------
