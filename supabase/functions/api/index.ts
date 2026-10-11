@@ -139,16 +139,30 @@ serve(async (req: Request) => {
     switch (action) {
       // --- Data asesmen (dibatasi lingkup organisasi) ---
       case "save":
-        result = await saveDataAsesmen(session, body.payload);
+        result = await saveDataAsesmen(session, body.payload, body.wali, body.nakes);
         break;
       case "read":
         result = await readDataAsesmen(session);
         break;
       case "update":
-        result = await updateDataAsesmen(session, body.id, body.payload);
+        result = await updateDataAsesmen(session, body.id, body.payload, body.wali, body.nakes);
         break;
       case "delete":
         result = await deleteDataAsesmen(session, body.id);
+        break;
+
+      // --- Tanda tangan & pengesahan ---
+      case "getMySignature":
+        result = await getMySignature(session);
+        break;
+      case "saveMySignature":
+        result = await saveMySignature(session, body.image);
+        break;
+      case "listPenandatangan":
+        result = await listPenandatangan(session);
+        break;
+      case "getPengesahan":
+        result = await getPengesahan(session, body.id);
         break;
 
       // --- Akun sendiri ---
@@ -324,7 +338,7 @@ function extractNoRegister(payload: unknown[]): string {
   return String(payload[2] ?? "").trim();
 }
 
-async function saveDataAsesmen(session: SessionPayload, payload: unknown[]) {
+async function saveDataAsesmen(session: SessionPayload, payload: unknown[], wali?: string, nakes?: string) {
   if (session.tingkat !== "UPT") {
     return forbidden("Hanya user tingkat UPT yang dapat menginput data asesmen.");
   }
@@ -336,6 +350,9 @@ async function saveDataAsesmen(session: SessionPayload, payload: unknown[]) {
     no_register: noRegister,
     payload,
     upt_id: session.upt_id, // selalu diisi dari sesi, bukan dari client
+    asesor_username: session.username,
+    wali_username: wali || null,
+    nakes_username: nakes || null,
   });
 
   if (error) {
@@ -367,7 +384,7 @@ async function readDataAsesmen(session: SessionPayload) {
 
   let query = supabase
     .from("hasil_asesmen")
-    .select("id, payload, upt_id, upt:upt_id(nama, kanwil:kanwil_id(nama))")
+    .select("id, payload, upt_id, wali_username, nakes_username, upt:upt_id(nama, kanwil:kanwil_id(nama))")
     .order("created_at", { ascending: false });
   if (uptIds !== null) {
     query = query.in("upt_id", uptIds);
@@ -387,11 +404,13 @@ async function readDataAsesmen(session: SessionPayload) {
     ...(row.payload as unknown[]),
     row.upt?.nama ?? "",
     row.upt?.kanwil?.nama ?? "",
+    row.wali_username ?? "",
+    row.nakes_username ?? "",
   ]);
   return { success: true, data: records };
 }
 
-async function updateDataAsesmen(session: SessionPayload, idNoreg: string, payload: unknown[]) {
+async function updateDataAsesmen(session: SessionPayload, idNoreg: string, payload: unknown[], wali?: string, nakes?: string) {
   if (session.tingkat !== "UPT") {
     return forbidden("Hanya user tingkat UPT yang dapat mengubah data asesmen.");
   }
@@ -413,7 +432,7 @@ async function updateDataAsesmen(session: SessionPayload, idNoreg: string, paylo
 
   const { error: updateError } = await supabase
     .from("hasil_asesmen")
-    .update({ no_register: newNoRegister, payload })
+    .update({ no_register: newNoRegister, payload, wali_username: wali || null, nakes_username: nakes || null })
     .eq("id", existing.id);
 
   if (updateError) {
@@ -450,6 +469,108 @@ async function deleteDataAsesmen(session: SessionPayload, idNoreg: string) {
     return { success: false, message: "Gagal hapus: " + deleteError.message };
   }
   return { success: true, message: "Data berhasil dihapus!" };
+}
+
+// ---------------------------------------------------------------------------
+// Tanda tangan & pengesahan
+// ---------------------------------------------------------------------------
+const MAX_SIGNATURE_LENGTH = 400_000; // karakter data URL (~300 KB)
+
+async function getMySignature(session: SessionPayload) {
+  const { data, error } = await supabase
+    .from("users")
+    .select("tanda_tangan")
+    .eq("username", session.username)
+    .maybeSingle();
+  if (error) return { success: false, message: error.message };
+  return { success: true, image: data?.tanda_tangan ?? null };
+}
+
+// image = data URL PNG/JPEG, atau null untuk menghapus tanda tangan.
+async function saveMySignature(session: SessionPayload, image: unknown) {
+  if (image !== null && image !== undefined && image !== "") {
+    if (
+      typeof image !== "string" ||
+      !/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(image)
+    ) {
+      return { success: false, message: "Format gambar harus PNG atau JPEG." };
+    }
+    if (image.length > MAX_SIGNATURE_LENGTH) {
+      return { success: false, message: "Ukuran gambar terlalu besar." };
+    }
+  }
+  const { error } = await supabase
+    .from("users")
+    .update({ tanda_tangan: image || null })
+    .eq("username", session.username);
+  if (error) return { success: false, message: "Gagal menyimpan: " + error.message };
+  return { success: true, message: image ? "Tanda tangan berhasil disimpan." : "Tanda tangan dihapus." };
+}
+
+// Daftar user pada UPT pemanggil yang bisa dipilih sebagai wali / tenaga kesehatan.
+async function listPenandatangan(session: SessionPayload) {
+  if (session.tingkat !== "UPT" || !session.upt_id) return forbidden();
+  const { data, error } = await supabase
+    .from("users")
+    .select("username, nama, peran, tanda_tangan")
+    .eq("upt_id", session.upt_id)
+    .order("nama");
+  if (error) return { success: false, message: error.message };
+  // deno-lint-ignore no-explicit-any
+  return {
+    success: true,
+    // deno-lint-ignore no-explicit-any
+    data: (data ?? []).map((u: any) => ({
+      username: u.username,
+      nama: u.nama,
+      peran: u.peran,
+      has_ttd: !!u.tanda_tangan,
+    })),
+  };
+}
+
+// Data pengesahan (nama + gambar tanda tangan) untuk satu asesmen, dengan
+// pembatasan lingkup yang sama seperti readDataAsesmen.
+async function getPengesahan(session: SessionPayload, idNoreg: string) {
+  const { data: rec, error } = await supabase
+    .from("hasil_asesmen")
+    .select("upt_id, payload, asesor_username, wali_username, nakes_username")
+    .eq("no_register", String(idNoreg).trim())
+    .maybeSingle();
+  if (error || !rec) return { success: false, message: "Data asesmen tidak ditemukan." };
+
+  const uptIds = await scopedUptIds(session);
+  if (uptIds !== null && !uptIds.includes(rec.upt_id)) return forbidden();
+
+  const fetchUser = async (username: string | null) => {
+    if (!username) return null;
+    const { data } = await supabase
+      .from("users")
+      .select("username, nama, peran, tanda_tangan")
+      .eq("username", username)
+      .maybeSingle();
+    return data ?? null;
+  };
+
+  let asesor = await fetchUser(rec.asesor_username);
+  if (!asesor) {
+    // Data lama tanpa asesor_username: cocokkan nama asesor pada UPT yang sama.
+    const nama = (rec.payload as unknown[])[0];
+    const { data } = await supabase
+      .from("users")
+      .select("username, nama, peran, tanda_tangan")
+      .eq("upt_id", rec.upt_id)
+      .eq("nama", nama)
+      .maybeSingle();
+    asesor = data ?? null;
+  }
+
+  return {
+    success: true,
+    asesor,
+    wali: await fetchUser(rec.wali_username),
+    nakes: await fetchUser(rec.nakes_username),
+  };
 }
 
 // ---------------------------------------------------------------------------

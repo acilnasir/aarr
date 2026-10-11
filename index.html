@@ -64,6 +64,7 @@
     <h4>Sistem Asesmen IKP-R</h4>
     <div>
       <span id="userInfo" class="badge bg-secondary me-2"></span>
+      <button id="btnTtdSaya" class="btn btn-sm btn-outline-primary me-2" onclick="openTtdModal()">✍️ Tanda Tangan Saya</button>
       <button id="btnToggleLock" class="btn btn-sm me-2 d-none" onclick="toggleKunciAplikasi()"></button>
       <button class="btn btn-sm btn-outline-danger" onclick="location.reload()">Keluar</button>
     </div>
@@ -268,6 +269,13 @@
               <div class="col-md-6"><label class="form-label">Sidang TPP UPT</label><select class="form-select border-primary" id="val_tpp"><option>Disetujui</option><option>Tidak Disetujui</option><option>Ditunda</option></select></div>
             </div>
             
+            <h6 class="mt-4 fw-bold">Penandatangan Pengesahan</h6>
+            <div class="row g-3">
+              <div class="col-md-6"><label class="form-label">Wali Pemasyarakatan</label><select class="form-select" id="sel_wali"><option value="">-- Pilih --</option></select></div>
+              <div class="col-md-6"><label class="form-label">Tenaga Kesehatan</label><select class="form-select" id="sel_nakes"><option value="">-- Pilih --</option></select></div>
+            </div>
+            <div class="form-text">Asesor adalah user yang menginput. Tanda tangan diunggah masing-masing user lewat tombol "Tanda Tangan Saya".</div>
+
             <hr class="mt-5">
             <button type="button" class="btn btn-primary btn-lg w-100 shadow" id="btnSimpan" onclick="submitData()">💾 SIMPAN DATA</button>
           </div>
@@ -337,6 +345,22 @@
 </div>
 
 <!-- MODAL GENERIK UNTUK KELOLA WILAYAH / UPT / USER -->
+<div class="modal fade" id="ttdModal" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">✍️ Tanda Tangan Saya</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <p class="small text-muted">Unggah gambar tanda tangan (PNG/JPG). Latar transparan/putih paling baik. Gambar otomatis diperkecil.</p>
+      <input type="file" class="form-control mb-3" id="ttdFile" accept="image/png,image/jpeg" onchange="onTtdFile(this)">
+      <div class="border rounded p-2 text-center bg-white" style="min-height:110px;"><img id="ttdPreview" style="max-width:100%;max-height:150px;display:none;"><span id="ttdEmpty" class="text-muted small">Belum ada tanda tangan</span></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline-danger me-auto" onclick="hapusTtd()">Hapus</button>
+      <button class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+      <button class="btn btn-primary" id="btnTtdSimpan" onclick="simpanTtd()">Simpan</button>
+    </div>
+  </div></div>
+</div>
+
 <div class="modal fade" id="adminModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -453,6 +477,7 @@
 
           applyKunciAplikasiUI();
           applyStrukturOrganisasiUI();
+          loadPenandatangan();
           loadDataList(); 
         }
         else { alert(r.message); btn.innerText = "Masuk"; btn.disabled = false; }
@@ -642,18 +667,103 @@
       
       <p style="margin-top: 15px; font-size:10px;"><b>Pernyataan asesor:</b> Saya melaksanakan asesmen ini sesuai pedoman, tidak menerima imbalan dalam bentuk apa pun, dan tidak memiliki hubungan kepentingan dengan warga binaan yang dinilai.</p>
       
-      <table width="100%" style="margin-top:30px; font-size:11px;">
-        <tr>
-          <td width="65%"></td>
-          <td width="35%" align="center">Tanda Tangan Asesor,<br><br><br><br>( <b style="text-decoration: underline;">${d[1]}</b> )</td>
-        </tr>
-      </table>
+      <div id="pengesahanSlot"></div>
     </div>
     `;
 
     currentPdfFilename = 'Asesmen_IKPR_' + d[3] + '_' + d[2] + '.pdf';
     document.getElementById('pdfPaper').innerHTML = html;
+    document.getElementById('pengesahanSlot').innerHTML = buildPengesahanHtml(null, d);
     bootstrap.Modal.getOrCreateInstance(document.getElementById('pdfPreviewModal')).show();
+
+    callApi('getPengesahan', { id: d[3] }).then(r => {
+      if (r.success) document.getElementById('pengesahanSlot').innerHTML = buildPengesahanHtml(r, d);
+    }).catch(() => {});
+  }
+
+  function escHtml(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+  // Blok pengesahan: 3 kolom (Wali, Asesor, Tenaga Kesehatan), gambar tanda tangan di atas nama.
+  function buildPengesahanHtml(r, d) {
+    const col = (judul, u, namaDefault) => {
+      const nama = u ? u.nama : namaDefault;
+      const img = (u && u.tanda_tangan)
+        ? `<img src="${u.tanda_tangan}" style="height:70px; max-width:160px; object-fit:contain;">`
+        : `<div style="height:70px;"></div>`;
+      const nip = u ? `<br>NIP. ${escHtml(u.username)}` : '';
+      return `<td width="33%" align="center" valign="bottom">${judul},<br>${img}<br>( <b style="text-decoration: underline;">${escHtml(nama || '.....................')}</b> )${nip}</td>`;
+    };
+    return `<table width="100%" style="margin-top:30px; font-size:11px; page-break-inside:avoid;"><tr>
+      ${col('Wali Pemasyarakatan', r && r.wali, '')}
+      ${col('Asesor', r && r.asesor, d[1])}
+      ${col('Tenaga Kesehatan', r && r.nakes, '')}
+    </tr></table>`;
+  }
+
+  // ---- Tanda tangan saya ----
+  let ttdDraft = null;
+
+  function loadPenandatangan() {
+    if (userTingkat !== 'UPT') return;
+    callApi('listPenandatangan').then(r => {
+      if (!r.success) return;
+      ['sel_wali', 'sel_nakes'].forEach(id => {
+        const sel = document.getElementById(id);
+        sel.innerHTML = '<option value="">-- Pilih --</option>' + r.data.map(u =>
+          `<option value="${escHtml(u.username)}">${escHtml(u.nama)} (${escHtml(u.peran || '')})${u.has_ttd ? '' : ' - belum ada TTD'}</option>`).join('');
+      });
+    });
+  }
+
+  function showTtdPreview(src) {
+    const img = document.getElementById('ttdPreview');
+    img.style.display = src ? 'inline-block' : 'none';
+    if (src) img.src = src;
+    document.getElementById('ttdEmpty').style.display = src ? 'none' : 'inline';
+  }
+
+  function openTtdModal() {
+    ttdDraft = null;
+    document.getElementById('ttdFile').value = '';
+    showTtdPreview(null);
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('ttdModal')).show();
+    callApi('getMySignature').then(r => { if (r.success && !ttdDraft) showTtdPreview(r.image); });
+  }
+
+  function onTtdFile(input) {
+    const f = input.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const im = new Image();
+      im.onload = () => {
+        const scale = Math.min(1, 500 / im.width, 200 / im.height);
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(im.width * scale));
+        c.height = Math.max(1, Math.round(im.height * scale));
+        c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+        ttdDraft = c.toDataURL('image/png');
+        showTtdPreview(ttdDraft);
+      };
+      im.onerror = () => alert('File bukan gambar yang valid.');
+      im.src = reader.result;
+    };
+    reader.readAsDataURL(f);
+  }
+
+  function simpanTtd() {
+    if (!ttdDraft) return alert('Pilih file gambar terlebih dahulu.');
+    callApi('saveMySignature', { image: ttdDraft }).then(r => {
+      alert(r.message);
+      if (r.success) { bootstrap.Modal.getInstance(document.getElementById('ttdModal')).hide(); loadPenandatangan(); }
+    });
+  }
+
+  function hapusTtd() {
+    if (!confirm('Hapus tanda tangan Anda?')) return;
+    callApi('saveMySignature', { image: null }).then(r => {
+      alert(r.message); ttdDraft = null; showTtdPreview(null); loadPenandatangan();
+    });
   }
 
   let currentPdfFilename = 'Asesmen_IKPR.pdf';
@@ -727,6 +837,8 @@
     
     ['val_skorM4D','val_gt','val_kat','val_klaster','val_tpp'].forEach((tid, i) => document.getElementById(tid).value = d[i+101] || "");
     
+    document.getElementById('sel_wali').value = d[108] || "";
+    document.getElementById('sel_nakes').value = d[109] || "";
     calcTotal(); 
     
     let btn = document.getElementById('btnSimpan');
@@ -780,6 +892,8 @@
 
     let actionName = activeEditNoreg ? "update" : "save";
     let extra = activeEditNoreg ? { id: activeEditNoreg, payload: arr } : { payload: arr };
+    extra.wali = document.getElementById('sel_wali').value;
+    extra.nakes = document.getElementById('sel_nakes').value;
 
     callApi(actionName, extra).then(r => {
       alert(r.message); 
