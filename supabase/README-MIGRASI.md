@@ -121,3 +121,63 @@ Selama Apps Script lama belum dimatikan, Anda bisa kembalikan
 `API_URL` ke URL `script.google.com/.../exec` yang lama kapan saja sebagai
 jalur mundur, tanpa kehilangan data (karena proses import tidak menghapus
 data asli di Google Sheets).
+
+## Struktur organisasi berjenjang nasional (UPT / Kanwil / Ditjen)
+
+Sejak migrasi `0002_struktur_wilayah.sql`, aplikasi mendukung 3 level
+organisasi untuk penggunaan skala nasional:
+
+- **UPT** (kabupaten/kota) — Balai Pemasyarakatan (Bapas), Lembaga
+  Pemasyarakatan (Lapas), Rumah Tahanan Negara (Rutan), atau Lembaga
+  Pembinaan Khusus Anak (LPKA). Level ini adalah pengguna asesmen
+  sehari-hari (sama persis dengan pengalaman aplikasi sebelumnya).
+- **KANWIL** (provinsi) — memantau seluruh data asesmen & UPT dalam satu
+  provinsi, dan dapat mengubah (bukan membuat/menghapus) profil UPT di
+  wilayahnya.
+- **DITJEN** (nasional) — memantau seluruh data secara nasional, dan satu
+  -satunya level yang dapat membuat/menghapus Kanwil & UPT.
+
+### Tabel baru
+
+- `kanwil` — profil Kantor Wilayah (nama, provinsi, kepala, alamat).
+- `upt` — profil Unit Pelaksana Teknis, terhubung ke `kanwil` lewat
+  `kanwil_id`.
+- `ditjen_profile` — profil Ditjen, tabel singleton (hanya 1 baris, `id=1`).
+- `users.tingkat` / `users.upt_id` / `users.kanwil_id` — menentukan level
+  & unit organisasi setiap user, terpisah dari `peran` (jabatan, mis.
+  "Kepala Bapas") yang sudah ada sebelumnya.
+- `hasil_asesmen.upt_id` — UPT **milik asesor** yang menginput data
+  (diisi otomatis dari sesi login, bukan dari form), dipakai untuk
+  pemantauan berjenjang. Ini berbeda dari kolom bebas "UPT/Kanwil" di
+  dalam form yang menjelaskan Lapas/Rutan tempat narapidana ditahan.
+
+### Sesi & otorisasi
+
+Edge Function sekarang mengeluarkan **token sesi** (HMAC-SHA256,
+berlaku 12 jam) saat `login`, berisi identitas & lingkup organisasi
+pemanggil. Semua action selain `login` wajib menyertakan `token` ini;
+server memverifikasi token dan membatasi data/aksi berdasarkan lingkup
+organisasi yang tertanam di dalamnya (tidak bisa dipalsukan dari client).
+
+Secret `APP_SESSION_SECRET` untuk menandatangani token di-set lewat:
+
+```bash
+supabase secrets set APP_SESSION_SECRET=<nilai_acak_panjang>
+```
+
+### Action baru di Edge Function
+
+`listKanwil`, `createKanwil`, `updateKanwil`, `deleteKanwil`,
+`listUpt`, `createUpt`, `updateUpt`, `deleteUpt`,
+`getDitjenProfile`, `updateDitjenProfile`,
+`listUsers`, `createUser`, `updateUser`, `deleteUser`,
+`changePassword`.
+
+### UI baru
+
+User tingkat KANWIL/DITJEN mendapat tab tambahan (Kelola Wilayah -
+Ditjen saja, Kelola UPT, Kelola User, Profil Ditjen - Ditjen saja) serta
+melihat kolom "UPT Asesor"/"Kanwil" tambahan pada dashboard "Data Asesmen"
+(berfungsi sebagai dashboard pemantauan berjenjang). **User tingkat UPT
+tidak mendapat perubahan tampilan apapun.**
+
