@@ -212,3 +212,7 @@ tidak mendapat perubahan tampilan apapun.**
 - `hasil_asesmen.upt_id` = UPT tempat WBP berada; kolom baru `asesor_upt_id` = UPT asal asesor bila berbeda (mis. Bapas). Data terlihat dan dapat diedit/dihapus oleh kedua UPT.
 - Wali, tenaga kesehatan, dan asesor dapat saling mengedit. Wali/nakes harus pegawai UPT lokasi WBP; asesor dari UPT lokasi atau Bapas yang mencakup wilayahnya. User Bapas memilih lokasi WBP (`lokasi_upt_id`) saat input (`getLokasiAsesmen`).
 - Blok pengesahan PDF: Wali (kiri), Tenaga Kesehatan (tengah), Asesor (kanan).
+
+## Status penandatangan user (migrasi 0007)
+
+Kolom `users.status_penandatangan` (array: `asesor`, `wali`, `nakes`; boleh lebih dari satu), diatur di Kelola User. Dropdown wali/nakes/asesor pada form asesmen dan validasi server hanya menerima user dengan status yang sesuai.

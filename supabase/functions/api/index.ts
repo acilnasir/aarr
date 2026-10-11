@@ -421,19 +421,22 @@ async function validateSigners(
   uptId: string,
   s: { wali?: string | null; nakes?: string | null; asesor?: string | null },
 ): Promise<{ ok: true; asesorUptId: string | null } | { ok: false; message: string }> {
-  const userUpt = async (username: string) => {
-    const { data } = await supabase.from("users").select("upt_id").eq("username", username).maybeSingle();
-    return (data?.upt_id as string | null | undefined) ?? undefined;
+  const userInfo = async (username: string) => {
+    const { data } = await supabase.from("users").select("upt_id, status_penandatangan").eq("username", username).maybeSingle();
+    return data as { upt_id: string | null; status_penandatangan: string[] } | null;
   };
-  for (const [label, u] of [["Wali", s.wali], ["Tenaga kesehatan", s.nakes]] as const) {
-    if (u && (await userUpt(u)) !== uptId) {
-      return { ok: false, message: `${label} harus pegawai UPT tempat WBP berada.` };
-    }
+  for (const [label, key, u] of [["Wali", "wali", s.wali], ["Tenaga kesehatan", "nakes", s.nakes]] as const) {
+    if (!u) continue;
+    const info = await userInfo(u);
+    if (info?.upt_id !== uptId) return { ok: false, message: `${label} harus pegawai UPT tempat WBP berada.` };
+    if (!info.status_penandatangan.includes(key)) return { ok: false, message: `${label} yang dipilih belum berstatus ${key} pada data user.` };
   }
   let asesorUptId: string | null = null;
   if (s.asesor) {
-    const au = await userUpt(s.asesor);
+    const ai = await userInfo(s.asesor);
+    const au = ai?.upt_id;
     if (!au) return { ok: false, message: "Asesor tidak ditemukan." };
+    if (!ai.status_penandatangan.includes("asesor")) return { ok: false, message: "User yang dipilih belum berstatus asesor." };
     if (au !== uptId) {
       const bapasIds = (await coveringBapas(uptId)).map((b) => b.id);
       if (!bapasIds.includes(au)) {
@@ -679,7 +682,7 @@ async function listPenandatangan(session: SessionPayload, lokasiUptId?: string) 
   const uptIds = [uptId, ...(await coveringBapas(uptId)).map((b) => b.id)];
   const { data, error } = await supabase
     .from("users")
-    .select("username, nama, peran, upt_id, tanda_tangan, upt:upt_id(nama)")
+    .select("username, nama, peran, status_penandatangan, upt_id, tanda_tangan, upt:upt_id(nama)")
     .in("upt_id", uptIds)
     .order("nama");
   if (error) return { success: false, message: error.message };
@@ -688,6 +691,7 @@ async function listPenandatangan(session: SessionPayload, lokasiUptId?: string) 
     username: u.username,
     nama: u.nama,
     peran: u.peran,
+    status: u.status_penandatangan ?? [],
     upt_id: u.upt_id,
     upt_nama: u.upt?.nama ?? "",
     has_ttd: !!u.tanda_tangan,
@@ -1201,7 +1205,7 @@ async function updateDitjenProfile(session: SessionPayload, payload: Record<stri
 async function listUsers(session: SessionPayload) {
   if (session.tingkat === "UPT" && !isKepalaBapas(session)) return forbidden();
 
-  const selectCols = "username, nama, peran, tingkat, upt_id, kanwil_id, upt:upt_id(nama), kanwil:kanwil_id(nama)";
+  const selectCols = "username, nama, peran, status_penandatangan, tingkat, upt_id, kanwil_id, upt:upt_id(nama), kanwil:kanwil_id(nama)";
 
   if (session.tingkat === "UPT") {
     const { data, error } = await supabase.from("users").select(selectCols).eq("upt_id", session.upt_id).order("username");
@@ -1252,6 +1256,16 @@ async function canManageTargetUser(
   return !!data && data.kanwil_id === session.kanwil_id;
 }
 
+const STATUS_PENANDATANGAN = ["asesor", "wali", "nakes"];
+
+// Mengembalikan daftar status yang valid & unik, atau null bila ada nilai tak dikenal.
+function normalizeStatus(v: unknown): string[] | null {
+  if (v === undefined || v === null) return [];
+  if (!Array.isArray(v)) return null;
+  const out = [...new Set(v.map(String))];
+  return out.every((x) => STATUS_PENANDATANGAN.includes(x)) ? out : null;
+}
+
 async function createUser(session: SessionPayload, payload: Record<string, unknown>) {
   if (session.tingkat === "UPT" && !isKepalaBapas(session)) return forbidden();
   const { username, password, nama, peran, tingkat, upt_id, kanwil_id } = payload as {
@@ -1264,6 +1278,8 @@ async function createUser(session: SessionPayload, payload: Record<string, unkno
 
   const allowed = await canManageTargetUser(session, tingkat, upt_id ?? null, kanwil_id ?? null);
   if (!allowed) return forbidden("Anda tidak berwenang membuat user dengan lingkup ini.");
+  const status = normalizeStatus(payload.status_penandatangan);
+  if (status === null) return { success: false, message: "Status penandatangan tidak valid." };
 
   const { error } = await supabase.from("users").insert({
     username,
@@ -1273,6 +1289,7 @@ async function createUser(session: SessionPayload, payload: Record<string, unkno
     tingkat,
     upt_id: tingkat === "UPT" ? upt_id : null,
     kanwil_id: tingkat === "KANWIL" ? kanwil_id : null,
+    status_penandatangan: status,
   });
   if (error) return { success: false, message: "Gagal menambah user: " + error.message };
   return { success: true, message: "User berhasil ditambahkan." };
@@ -1306,6 +1323,11 @@ async function updateUser(session: SessionPayload, username: string, payload: Re
     nama, peran, tingkat: newTingkat, upt_id: newUptId, kanwil_id: newKanwilId,
   };
   if (password) update.password_hash = hashSync(password);
+  if (payload.status_penandatangan !== undefined) {
+    const status = normalizeStatus(payload.status_penandatangan);
+    if (status === null) return { success: false, message: "Status penandatangan tidak valid." };
+    update.status_penandatangan = status;
+  }
 
   const { error } = await supabase.from("users").update(update).eq("username", username);
   if (error) return { success: false, message: "Gagal mengubah user: " + error.message };

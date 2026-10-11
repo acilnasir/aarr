@@ -373,8 +373,8 @@
       </div>
       <div class="table-responsive">
         <table class="table table-bordered table-hover align-middle">
-          <thead class="table-dark"><tr><th>Username</th><th>Nama</th><th>Peran/Jabatan</th><th>Tingkat</th><th>Unit</th><th>Aksi</th></tr></thead>
-          <tbody id="userTableBody"><tr><td colspan="6" class="text-center">Memuat data...</td></tr></tbody>
+          <thead class="table-dark"><tr><th>Username</th><th>Nama</th><th>Peran/Jabatan</th><th>Status</th><th>Tingkat</th><th>Unit</th><th>Aksi</th></tr></thead>
+          <tbody id="userTableBody"><tr><td colspan="7" class="text-center">Memuat data...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -1000,10 +1000,10 @@
         asesor: document.getElementById('sel_asesor').value,
       };
       const opt = u => `<option value="${escHtml(u.username)}" data-nama="${escHtml(u.nama)}">${escHtml(u.nama)} (${escHtml(u.peran || '')})${u.upt_nama && u.upt_id !== (lokasiUptId || userUptId) ? ' - ' + escHtml(u.upt_nama) : ''}${u.has_ttd ? '' : ' - belum ada TTD'}</option>`;
-      ['sel_wali', 'sel_nakes'].forEach(id => {
-        document.getElementById(id).innerHTML = '<option value="">-- Pilih --</option>' + r.data.map(opt).join('');
-      });
-      document.getElementById('sel_asesor').innerHTML = (r.asesor || r.data).map(opt).join('');
+      const withStatus = (list, st) => list.filter(u => (u.status || []).includes(st) || (prev[st === 'asesor' ? 'asesor' : st] === u.username));
+      document.getElementById('sel_wali').innerHTML = '<option value="">-- Pilih --</option>' + withStatus(r.data, 'wali').map(opt).join('');
+      document.getElementById('sel_nakes').innerHTML = '<option value="">-- Pilih --</option>' + withStatus(r.data, 'nakes').map(opt).join('');
+      document.getElementById('sel_asesor').innerHTML = withStatus(r.asesor || r.data, 'asesor').map(opt).join('');
       document.getElementById('sel_wali').value = prev.wali || '';
       document.getElementById('sel_nakes').value = prev.nakes || '';
       document.getElementById('sel_asesor').value = prev.asesor || sessionUsername;
@@ -1282,6 +1282,7 @@
   // menentukan jenis form & aksi simpan yang dipanggil).
   // =========================================================================
   const JENIS_UPT_OPTIONS = ["Balai Pemasyarakatan", "Lembaga Pemasyarakatan", "Rumah Tahanan Negara", "Lembaga Pembinaan Khusus Anak"];
+  const STATUS_LABEL = { asesor: 'Asesor', wali: 'Wali', nakes: 'Tenaga Kesehatan' };
   let kanwilCache = [];
   let uptCache = [];
   let adminModalMode = null; // { type: 'kanwil' | 'upt' | 'user', id }
@@ -1383,16 +1384,16 @@
   // --- KELOLA USER ---
   function loadUserList() {
     let tbody = document.getElementById('userTableBody');
-    tbody.innerHTML = `<tr><td colspan="6" class="text-center">Memuat data...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center">Memuat data...</td></tr>`;
     Promise.all([callApi("listUsers"), userTingkat === 'UPT' ? Promise.resolve({ success: false }) : callApi("listUpt"), userTingkat === 'DITJEN' ? callApi("listKanwil") : Promise.resolve({ success: true, data: kanwilCache })])
     .then(([userRes, uptRes, kanwilRes]) => {
       if (uptRes.success) uptCache = uptRes.data || [];
       if (kanwilRes.success) kanwilCache = kanwilRes.data || [];
-      if (!userRes.success) { tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">${userRes.message}</td></tr>`; return; }
+      if (!userRes.success) { tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger">${userRes.message}</td></tr>`; return; }
       let users = userRes.data || [];
-      if (users.length === 0) { tbody.innerHTML = `<tr><td colspan="6" class="text-center">Belum ada data.</td></tr>`; return; }
+      if (users.length === 0) { tbody.innerHTML = `<tr><td colspan="7" class="text-center">Belum ada data.</td></tr>`; return; }
       tbody.innerHTML = users.map(u => `<tr>
-        <td>${esc(u.username)}</td><td>${esc(u.nama)}</td><td>${esc(u.peran)}</td><td>${esc(u.tingkat)}</td>
+        <td>${esc(u.username)}</td><td>${esc(u.nama)}</td><td>${esc(u.peran)}</td><td>${(u.status_penandatangan || []).map(x => `<span class="badge bg-info text-dark me-1">${STATUS_LABEL[x] || esc(x)}</span>`).join() || '-'}</td><td>${esc(u.tingkat)}</td>
         <td>${esc((u.upt && u.upt.nama) || (u.kanwil && u.kanwil.nama) || '-')}</td>
         <td>
           <button class="btn btn-sm btn-primary" onclick="openUserModal('${u.username}')">✏️ Edit</button>
@@ -1434,6 +1435,8 @@
         <input type="text" id="am_nama" class="form-control mb-2" value="${esc(u && u.nama)}">
         <label class="form-label">Peran/Jabatan</label>
         <input type="text" id="am_peran" class="form-control mb-2" value="${esc(u && u.peran)}">
+        <label class="form-label d-block">Status Penandatangan Asesmen</label>
+        <div class="mb-2">${Object.entries(STATUS_LABEL).map(([k, v]) => `<div class="form-check form-check-inline"><input class="form-check-input am-status" type="checkbox" id="am_st_${k}" value="${k}" ${u && (u.status_penandatangan || []).includes(k) ? 'checked' : ''}><label class="form-check-label" for="am_st_${k}">${v}</label></div>`).join('')}</div>
         <label class="form-label">Tingkat</label>
         <select id="am_tingkat" class="form-select mb-2" onchange="document.getElementById('am_unit_container').innerHTML = renderUnitFieldByTingkat(this.value, null, null)">
           ${tingkatOptions.map(t => `<option value="${t}" ${tingkatAwal === t ? 'selected' : ''}>${t}</option>`).join('')}
@@ -1503,6 +1506,7 @@
       let payload = {
         nama: document.getElementById('am_nama').value,
         peran: document.getElementById('am_peran').value,
+        status_penandatangan: Array.from(document.querySelectorAll('.am-status:checked')).map(c => c.value),
         tingkat: tingkat,
         upt_id: tingkat === 'UPT' ? (document.getElementById('am_upt_id') ? document.getElementById('am_upt_id').value : null) : null,
         kanwil_id: tingkat === 'KANWIL' ? (document.getElementById('am_kanwil_id') ? document.getElementById('am_kanwil_id').value : null) : null,
