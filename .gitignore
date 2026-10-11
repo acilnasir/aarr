@@ -1,0 +1,9 @@
+# Secrets / local config
+.env
+.env.local
+
+# Data ekspor dari Google Sheets (berisi data pribadi/PII) - JANGAN di-commit
+supabase/import/data/
+
+# Supabase CLI local state
+.supabase/

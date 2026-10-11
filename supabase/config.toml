@@ -1,0 +1,6 @@
+project_id = "GANTI_DENGAN_PROJECT_REF_ANDA"
+
+[functions.api]
+# Nonaktifkan verifikasi JWT supaya endpoint bisa dipanggil langsung dari
+# index.html seperti saat memakai Apps Script dulu (tanpa header Authorization).
+verify_jwt = false
