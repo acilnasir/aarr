@@ -2,6 +2,7 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>STAR-PK - Fitur Asesmen Rehabilitasi dan Reedukasi</title>
   <link rel="icon" href="logo-starpk.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -64,6 +65,20 @@
     .mod-card:hover { box-shadow:0 6px 18px rgba(14,32,60,.12); transform:translateY(-2px); }
     .mod-card .ic { width:52px; height:52px; border-radius:12px; background:#FFF6D6; color:#B58900; display:flex; align-items:center; justify-content:center; font-size:1.6rem; flex:0 0 52px; }
     @media (max-width:991px) { .star-shell:not(.collapsed) .star-side { position:fixed; left:0; top:0; z-index:200; } .star-content { padding:16px; } }
+    @media (max-width:767px) {
+      .star-login-card { padding:24px 20px; }
+      .star-topbar { height:auto; min-height:56px; padding:8px 12px; }
+      .star-user { font-size:.85rem; }
+      .star-topbar .btn { font-size:.8rem; padding:.2rem .5rem; }
+      .star-content { padding:12px; }
+      .star-panel { padding:12px !important; }
+      .star-welcome { padding:20px; } .star-welcome h2 { font-size:1.4rem; }
+      #pageTitle { font-size:1rem; } #pageCrumb { display:none; }
+      .star-side { width:260px; flex-basis:260px; }
+      .table { font-size:.85rem; }
+      .modal-dialog { margin:.5rem; }
+    }
+    .star-panel .table-responsive, .star-panel > .tab-pane { max-width:100%; }
   </style>
 </head>
 <body class="bg-light">
