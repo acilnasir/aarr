@@ -2,7 +2,11 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Aplikasi Asesmen Narapidana - IKP-R CRUD & Cetak PDF Full</title>
+  <title>STAR-PK - Fitur Asesmen Rehabilitasi dan Reedukasi</title>
+  <link rel="icon" href="logo-starpk.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -10,11 +14,56 @@
 
   <style>
     .form-label { font-weight: 600; font-size: 0.9rem; margin-top: 10px; }
-    .section-title { background: #0D3B66; color: white; padding: 8px 15px; border-radius: 4px; margin-top: 25px; }
+    .section-title { background: #0E203C; color: white; padding: 8px 15px; border-radius: 4px; margin-top: 25px; }
     .table-radio td { text-align: center; vertical-align: middle; }
     .table-radio th { font-size: 0.9rem; }
     #pdfPreviewBody { background: #6c757d; padding: 16px; overflow: auto; }
     #pdfPaper { background: #fff; width: 760px; max-width: 100%; margin: 0 auto; box-shadow: 0 0 8px rgba(0,0,0,.5); }
+
+    :root { --star-navy:#0E203C; --star-navy2:#1F3A5B; --star-gold:#F5B800; --bs-primary:#0E203C; --bs-primary-rgb:14,32,60; --bs-link-color:#0E203C; --bs-link-color-rgb:14,32,60; --bs-link-hover-color:#1F3A5B; --bs-body-font-family:'Outfit',sans-serif; --bs-body-bg:#F7F7F9; --bs-border-radius:4px; }
+    body { font-family:'Outfit',sans-serif; background:#F7F7F9 !important; color:#212529; }
+    .btn-primary { --bs-btn-bg:#0E203C; --bs-btn-border-color:#0E203C; --bs-btn-hover-bg:#1F3A5B; --bs-btn-hover-border-color:#1F3A5B; --bs-btn-active-bg:#1F3A5B; --bs-btn-active-border-color:#1F3A5B; --bs-btn-disabled-bg:#0E203C; --bs-btn-disabled-border-color:#0E203C; }
+    .btn-outline-primary { --bs-btn-color:#0E203C; --bs-btn-border-color:#0E203C; --bs-btn-hover-bg:#0E203C; --bs-btn-hover-border-color:#0E203C; --bs-btn-active-bg:#0E203C; --bs-btn-active-border-color:#0E203C; }
+    .btn-info { --bs-btn-color:#0E203C; --bs-btn-bg:#F5B800; --bs-btn-border-color:#F5B800; --bs-btn-hover-color:#0E203C; --bs-btn-hover-bg:#FFCB2E; --bs-btn-hover-border-color:#FFCB2E; --bs-btn-active-bg:#E0A800; --bs-btn-active-border-color:#E0A800; --bs-btn-active-color:#0E203C; }
+    .btn-info.text-white { color:#0E203C !important; }
+    .table-dark { --bs-table-bg:#0E203C; --bs-table-border-color:#1F3A5B; --bs-table-striped-bg:#1F3A5B; }
+    .card { border-color:#E4E6EB; border-radius:6px; }
+    .form-control:focus, .form-select:focus { border-color:#1F3A5B; box-shadow:0 0 0 .2rem rgba(14,32,60,.15); }
+    .star-header { border-bottom:3px solid #F5B800; }
+    .nav-tabs { border-bottom:1px solid #D9DCE3; }
+    .nav-tabs .nav-link { color:#0E203C !important; border:0; border-bottom:3px solid transparent; border-radius:0; background:transparent; }
+    .nav-tabs .nav-link:hover { border-bottom-color:#D9DCE3; }
+    .nav-tabs .nav-link.active { color:#0E203C !important; background:#fff; border-bottom-color:#F5B800; }
+    .star-login { min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px 16px 64px; position:relative;
+      background: radial-gradient(rgba(255,255,255,.07) 2px, transparent 2px) 0 0/28px 28px, linear-gradient(45deg, #1F3A5B 50%, #0E203C); }
+    .star-login-card { background:#fff; border-radius:6px; width:100%; max-width:440px; padding:36px 40px; box-shadow:0 10px 40px rgba(0,0,0,.35); }
+    .star-title { font-weight:600; color:#0E203C; }
+    .star-sub { color:#0E203C; font-weight:500; font-size:.95rem; }
+    .star-footer { position:absolute; bottom:24px; left:0; right:0; text-align:center; color:rgba(255,255,255,.55); font-size:.9rem; }
+    .star-shell { min-height:100vh; }
+    .star-side { width:270px; flex:0 0 270px; background:#0E203C; color:#fff; transition:margin .25s; overflow-y:auto; height:100vh; position:sticky; top:0; padding-bottom:24px; }
+    .star-shell.collapsed .star-side { margin-left:-270px; }
+    .star-side-logo { padding:18px 20px; text-align:center; } .star-side-logo img { max-width:100%; height:64px; object-fit:contain; background:#fff; border-radius:6px; padding:4px 8px; }
+    .star-side-label { padding:14px 24px 6px; font-weight:600; letter-spacing:.08em; font-size:.85rem; color:#fff; }
+    .side-item { display:flex; align-items:center; gap:12px; padding:11px 24px; color:#fff; cursor:pointer; text-decoration:none; font-size:1rem; user-select:none; border:0; background:transparent; width:100%; text-align:left; }
+    .side-item i.bi:first-child { font-size:1.2rem; width:22px; }
+    .side-item:hover { background:rgba(255,255,255,.06); color:#fff; }
+    .side-item.active { color:#F5B800; }
+    .side-item .chev { margin-left:auto; font-size:.8rem; transition:transform .2s; }
+    .side-group.open > .side-item .chev { transform:rotate(90deg); }
+    .side-sub { display:none; padding-left:22px; } .side-group.open > .side-sub { display:block; }
+    .side-sub .side-item { font-size:.93rem; padding:8px 24px; }
+    .star-main { flex:1; min-width:0; display:flex; flex-direction:column; }
+    .star-topbar { background:#13234a; background:linear-gradient(90deg,#0E203C,#16294a); height:64px; display:flex; align-items:center; padding:0 20px; gap:12px; position:sticky; top:0; z-index:100; }
+    .star-iconbtn { background:none; border:0; color:#F5B800; font-size:2rem; line-height:1; }
+    .star-user { color:#fff; font-weight:500; }
+    .star-content { padding:28px 32px; flex:1; }
+    .star-panel { border-radius:12px; border:1px solid #E4E6EB; }
+    .star-welcome { background:linear-gradient(135deg,#0E203C,#2F4F7F); color:#fff; border-radius:16px; padding:28px 32px; }
+    .mod-card { border:1px solid #E4E6EB; border-radius:12px; padding:20px; display:flex; gap:16px; align-items:center; cursor:pointer; background:#fff; transition:box-shadow .2s, transform .2s; height:100%; }
+    .mod-card:hover { box-shadow:0 6px 18px rgba(14,32,60,.12); transform:translateY(-2px); }
+    .mod-card .ic { width:52px; height:52px; border-radius:12px; background:#FFF6D6; color:#B58900; display:flex; align-items:center; justify-content:center; font-size:1.6rem; flex:0 0 52px; }
+    @media (max-width:991px) { .star-shell:not(.collapsed) .star-side { position:fixed; left:0; top:0; z-index:200; } .star-content { padding:16px; } }
   </style>
 </head>
 <body class="bg-light">
@@ -24,7 +73,7 @@
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="pdfPreviewTitle">Pratinjau Asesmen IKP-R</h5>
+        <h5 class="modal-title" id="pdfPreviewTitle">Pratinjau Asesmen STAR-PK</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body p-0" id="pdfPreviewBody"><div id="pdfPaper"></div></div>
@@ -38,47 +87,60 @@
 </div>
 
 <!-- DIV LOGIN -->
-<div class="container py-5" id="loginSection" style="max-width: 400px;">
-  <div class="text-center mb-3">
-    <img src="logo-kemenimipas.png" alt="Logo Kemenimipas" style="height: 90px;">
-    <h5 class="mt-2 mb-0 text-primary fw-bold">Aplikasi Asesmen Narapidana</h5>
-    <small class="text-muted">IKP-R CRUD &amp; Cetak PDF Full</small>
-  </div>
-  <div class="card shadow">
-    <div class="card-header bg-primary text-white text-center d-flex align-items-center justify-content-center gap-2">
-      <img src="logo-kemenimipas.png" alt="Logo Kemenimipas" style="height: 28px;">
-      <h5 class="mb-0">Login Asesor</h5>
+<div id="loginSection" class="star-login">
+  <div class="star-login-card">
+    <div class="text-center mb-4">
+      <img src="logo-starpk.png" alt="STAR-PK" style="max-width: 280px; width: 100%;">
+      <div class="star-sub mt-2">Fitur Asesmen Rehabilitasi dan Reedukasi</div>
     </div>
-    <div class="card-body">
-      <form id="formLogin">
-        <input type="text" id="username" class="form-control mb-2" placeholder="Username" required>
-        <input type="password" id="password" class="form-control mb-3" placeholder="Password" required>
-        <button type="button" class="btn btn-primary w-100" onclick="doLogin()">Masuk</button>
-      </form>
-    </div>
+    <h4 class="star-title">Selamat Datang !</h4>
+    <p class="text-muted mb-4">Silakan login untuk melanjutkan</p>
+    <form id="formLogin" onsubmit="doLogin(); return false;">
+      <label class="form-label" for="username">Username</label>
+      <input type="text" id="username" class="form-control form-control-lg mb-3" placeholder="Masukkan Username" required>
+      <label class="form-label" for="password">Password</label>
+      <input type="password" id="password" class="form-control form-control-lg mb-4" placeholder="Masukkan Password" required>
+      <button type="submit" class="btn btn-primary btn-lg w-100">Login</button>
+    </form>
+    <div class="text-center mt-4"><img src="logo-kemenimipas.png" alt="Logo Kemenimipas" style="height: 56px;"></div>
   </div>
+  <div class="star-footer">&copy; 2026 STAR-PK. Kementerian Imigrasi dan Pemasyarakatan</div>
 </div>
 
 <!-- DIV APLIKASI UTAMA -->
-<div class="container-fluid py-3 px-4" id="appSection" style="display:none;">
-  <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
-    <h4>Sistem Asesmen IKP-R</h4>
-    <div>
-      <span id="userInfo" class="badge bg-secondary me-2"></span>
-      <button id="btnTtdSaya" class="btn btn-sm btn-outline-primary me-2" onclick="openTtdModal()">✍️ Tanda Tangan Saya</button>
-      <button id="btnToggleLock" class="btn btn-sm me-2 d-none" onclick="toggleKunciAplikasi()"></button>
-      <button class="btn btn-sm btn-outline-danger" onclick="location.reload()">Keluar</button>
-    </div>
-  </div>
+<div id="appSection" class="star-shell" style="display:none;">
+  <aside class="star-side">
+    <div class="star-side-logo"><img src="logo-starpk.png" alt="STAR-PK"></div>
+    <div class="star-side-label">MENU</div>
+    <nav id="sideNav"></nav>
+  </aside>
+  <div class="star-main">
+    <header class="star-topbar">
+      <button class="star-iconbtn" onclick="document.getElementById('appSection').classList.toggle('collapsed')" title="Menu"><i class="bi bi-list"></i></button>
+      <div class="ms-auto d-flex align-items-center gap-2 flex-wrap justify-content-end">
+        <span id="userInfo" class="star-user"></span>
+        <button id="btnTtdSaya" class="btn btn-sm btn-outline-light" onclick="openTtdModal()"><i class="bi bi-pen"></i> Tanda Tangan Saya</button>
+        <button id="btnToggleLock" class="btn btn-sm d-none" onclick="toggleKunciAplikasi()"></button>
+        <button class="btn btn-sm btn-warning" onclick="location.reload()"><i class="bi bi-box-arrow-right"></i> Keluar</button>
+      </div>
+    </header>
+    <div class="star-content">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="m-0 text-uppercase fw-bold" id="pageTitle" style="color:#0E203C;">Laman</h5>
+        <small class="text-muted" id="pageCrumb">Laman</small>
+      </div>
 
   <!-- BANNER PENGUNCI APLIKASI (Disembunyikan secara default) -->
   <div id="lockBanner" class="alert alert-danger text-center fw-bold d-none mb-3 shadow-sm">
     🔒 APLIKASI TERKUNCI: Sesi penginputan dan pengubahan data asesmen telah ditutup.
   </div>
 
-  <ul class="nav nav-tabs" id="mainTabs">
+  <ul class="nav nav-tabs d-none" id="mainTabs">
+    <li class="nav-item" id="tabBerandaContainer">
+      <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabBeranda" type="button">Laman</button>
+    </li>
     <li class="nav-item">
-      <button class="nav-link active fw-bold text-primary" data-bs-toggle="tab" data-bs-target="#tabDashboard" type="button" onclick="loadDataList()">📋 Data Asesmen</button>
+      <button class="nav-link fw-bold text-primary" data-bs-toggle="tab" data-bs-target="#tabDashboard" type="button" onclick="loadDataList()">📋 Data Asesmen</button>
     </li>
     <li class="nav-item d-none" id="tabEksekutifContainer">
       <button class="nav-link fw-bold text-info" data-bs-toggle="tab" data-bs-target="#tabEksekutif" type="button" onclick="loadEksekutif()">📊 Dashboard Eksekutif</button>
@@ -103,8 +165,18 @@
     </li>
   </ul>
 
-  <div class="tab-content bg-white p-4 border border-top-0 shadow-sm">
-    
+  <div class="tab-content bg-white p-4 shadow-sm star-panel">
+
+    <!-- LAMAN (BERANDA) -->
+    <div class="tab-pane fade show active" id="tabBeranda">
+      <div class="star-welcome mb-4">
+        <div class="small text-uppercase" style="letter-spacing:.15em;opacity:.8;" id="welGreet">Selamat datang</div>
+        <h2 class="fw-bold my-1" id="welNama"></h2>
+        <div style="opacity:.85;" id="welInfo"></div>
+      </div>
+      <div class="row g-3" id="berandaCards"></div>
+    </div>
+
     <!-- DASHBOARD EKSEKUTIF -->
     <div class="tab-pane fade" id="tabEksekutif">
       <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
@@ -128,7 +200,7 @@
     </div>
 
     <!-- DASHBOARD -->
-    <div class="tab-pane fade show active" id="tabDashboard">
+    <div class="tab-pane fade" id="tabDashboard">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="m-0">Daftar Hasil Asesmen Narapidana</h5>
         <button class="btn btn-sm btn-info text-white" onclick="loadDataList()">🔄 Refresh Data</button>
@@ -136,6 +208,7 @@
       <div class="row g-2 mb-3">
         <div class="col-md-4"><input type="search" class="form-control form-control-sm" id="fltSearch" placeholder="🔍 Cari nama, no. register, asesor, UPT..." oninput="renderDataTable()"></div>
         <div class="col-md-2"><select class="form-select form-select-sm" id="fltAsesor" onchange="renderDataTable()"><option value="">Semua Asesor</option></select></div>
+        <div class="col-md-2"><select class="form-select form-select-sm d-none" id="fltKanwil" onchange="fillFilterOptions(); renderDataTable()"><option value="">Semua Kanwil</option></select></div>
         <div class="col-md-2"><select class="form-select form-select-sm d-none" id="fltUpt" onchange="renderDataTable()"><option value="">Semua UPT</option></select></div>
         <div class="col-md-2"><select class="form-select form-select-sm" id="fltKategori" onchange="renderDataTable()"><option value="">Semua Kategori</option><option>LAYAK</option><option>LAYAK BERSYARAT</option><option>TIDAK LAYAK</option><option>DITUNDA</option></select></div>
         <div class="col-md-2"><select class="form-select form-select-sm" id="fltEdit" onchange="renderDataTable()"><option value="">Semua waktu edit</option><option value="1">Diedit 24 jam terakhir</option><option value="7">Diedit 7 hari terakhir</option><option value="30">Diedit 30 hari terakhir</option></select></div>
@@ -405,6 +478,8 @@
       </div>
     </div>
   </div>
+    </div>
+  </div>
 </div>
 
 <!-- MODAL GENERIK UNTUK KELOLA WILAYAH / UPT / USER -->
@@ -482,6 +557,79 @@
 
   // Menyesuaikan tab & tombol yang tampil sesuai tingkat organisasi user login.
   // User tingkat UPT (termasuk Kepala Bapas) tidak mendapat perubahan apapun.
+  // Enam modul utama STAR-PK. Ubah aktif:true saat modul siap; sementara disembunyikan.
+  // Fitur Asesmen Rehabilitasi dan Reedukasi nantinya berada di bawah modul Litmas.
+  const MODUL_UTAMA = [
+    { nama: 'Registrasi Warga Binaan', icon: 'bi-person-vcard', aktif: false },
+    { nama: 'Penelitian Kemasyarakatan (Litmas)', icon: 'bi-journal-text', aktif: false },
+    { nama: 'Pendampingan', icon: 'bi-people', aktif: false },
+    { nama: 'Pembimbingan', icon: 'bi-person-check', aktif: false },
+    { nama: 'Pengawasan', icon: 'bi-eye', aktif: false },
+    { nama: 'Sidang TPP', icon: 'bi-hammer', aktif: false }
+  ];
+  const SIDE_MENU = [
+    { label: 'Laman', icon: 'bi-speedometer2', box: 'tabBerandaContainer' },
+    { label: 'Asesmen Rehabilitasi & Reedukasi', icon: 'bi-clipboard2-pulse', children: [
+      { label: 'Data Asesmen', icon: 'bi-table', box: 'tabDashboard', tab: true },
+      { label: 'Asesmen Baru', icon: 'bi-plus-circle', box: 'tabFormContainer' },
+      { label: 'Dashboard Eksekutif', icon: 'bi-bar-chart-line', box: 'tabEksekutifContainer' },
+      { label: 'Wilayah Kerja Bapas', icon: 'bi-map', box: 'tabWilayahKerjaContainer' }
+    ]},
+    { label: 'Administrasi', icon: 'bi-gear', children: [
+      { label: 'Kelola Wilayah', icon: 'bi-buildings', box: 'tabWilayahContainer' },
+      { label: 'Kelola UPT', icon: 'bi-bank', box: 'tabUptContainer' },
+      { label: 'Kelola User', icon: 'bi-person-gear', box: 'tabUserContainer' },
+      { label: 'Profil Ditjen', icon: 'bi-building', box: 'tabDitjenContainer' }
+    ]}
+  ];
+  const sideBtn = it => it.tab ? document.querySelector('#mainTabs [data-bs-target="#tabDashboard"]') : document.getElementById(it.box).querySelector('button');
+  const sideHidden = it => { const el = it.tab ? sideBtn(it).parentElement : document.getElementById(it.box); return el.classList.contains('d-none') || el.style.display === 'none'; };
+
+  function initShell() {
+    if (window.__shellInit) { syncSidebar(); return; }
+    window.__shellInit = true;
+    if (window.innerWidth < 992) document.getElementById('appSection').classList.add('collapsed');
+    const nav = document.getElementById('sideNav');
+    const item = (it, extra = '') => `<a class="side-item ${extra}" data-box="${it.box || ''}"><i class="bi ${it.icon}"></i><span>${it.label}</span>${it.children ? '<i class="bi bi-chevron-right chev"></i>' : ''}</a>`;
+    nav.innerHTML = MODUL_UTAMA.filter(m => m.aktif).map(m => item(m)).join('') + SIDE_MENU.map((g, gi) => g.children
+      ? `<div class="side-group open" data-g="${gi}">${item(g)}<div class="side-sub">${g.children.map((c, ci) => item(c).replace('<a ', `<a data-c="${gi}-${ci}" `)).join('')}</div></div>`
+      : item(g).replace('<a ', `<a data-c="${gi}" `)).join('');
+    nav.querySelectorAll('.side-group > .side-item').forEach(h => h.onclick = () => h.parentElement.classList.toggle('open'));
+    nav.querySelectorAll('[data-c]').forEach(a => a.onclick = () => {
+      const [gi, ci] = a.dataset.c.split('-');
+      const it = ci === undefined ? SIDE_MENU[gi] : SIDE_MENU[gi].children[ci];
+      sideBtn(it).click();
+      if (window.innerWidth < 992) document.getElementById('appSection').classList.add('collapsed');
+    });
+    new MutationObserver(syncSidebar).observe(document.getElementById('mainTabs'), { subtree: true, attributes: true, attributeFilter: ['class', 'style'] });
+    document.addEventListener('shown.bs.tab', e => {
+      const t = e.target.getAttribute('data-bs-target');
+      nav.querySelectorAll('[data-c]').forEach(a => {
+        const [gi, ci] = a.dataset.c.split('-');
+        const it = ci === undefined ? SIDE_MENU[gi] : SIDE_MENU[gi].children[ci];
+        const on = sideBtn(it).getAttribute('data-bs-target') === t;
+        a.classList.toggle('active', on);
+        if (on) { document.getElementById('pageTitle').innerText = it.label; document.getElementById('pageCrumb').innerText = (ci === undefined ? '' : SIDE_MENU[gi].label + ' › ') + it.label; }
+      });
+    });
+    document.querySelector('[data-c="0"]').classList.add('active');
+    const hr = new Date().getHours();
+    document.getElementById('welGreet').innerText = 'Selamat ' + (hr < 11 ? 'pagi' : hr < 15 ? 'siang' : hr < 18 ? 'sore' : 'malam');
+    document.getElementById('welNama').innerText = asr;
+    document.getElementById('welInfo').innerText = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) + (userJabatan ? ' · ' + userJabatan : '') + ' · ' + ({ UPT: 'UPT', KANWIL: 'Kanwil', DITJEN: 'Ditjenpas' }[userTingkat] || '');
+    document.getElementById('berandaCards').innerHTML = `<div class="col-md-6 col-xl-4"><div class="mod-card" onclick="sideBtn(SIDE_MENU[1].children[0]).click()"><div class="ic"><i class="bi bi-clipboard2-pulse"></i></div><div><div class="fw-bold" style="color:#0E203C;">Asesmen Rehabilitasi dan Reedukasi</div><small class="text-muted">Input, kelola, dan cetak hasil asesmen warga binaan</small></div></div></div>`;
+    syncSidebar();
+  }
+  function syncSidebar() {
+    const nav = document.getElementById('sideNav');
+    SIDE_MENU.forEach((g, gi) => {
+      if (!g.children) { const a = nav.querySelector(`[data-c="${gi}"]`); if (a) a.style.display = sideHidden(g) ? 'none' : ''; return; }
+      let any = false;
+      g.children.forEach((c, ci) => { const a = nav.querySelector(`[data-c="${gi}-${ci}"]`), h = sideHidden(c); if (a) a.style.display = h ? 'none' : ''; if (!h) any = true; });
+      nav.querySelector(`[data-g="${gi}"]`).style.display = any ? '' : 'none';
+    });
+  }
+
   function applyStrukturOrganisasiUI() {
     document.getElementById('thUptAsesor').classList.toggle('d-none', userTingkat === 'UPT');
     document.getElementById('thKanwilAsesor').classList.toggle('d-none', userTingkat === 'UPT');
@@ -534,7 +682,7 @@
           userUptId = r.user.upt_id || null;
           userKanwilId = r.user.kanwil_id || null;
           document.getElementById('loginSection').style.display = 'none'; 
-          document.getElementById('appSection').style.display = 'block'; 
+          document.getElementById('appSection').style.display = 'flex'; initShell(); 
           document.getElementById('userInfo').innerText = asr; 
 
           applyStrukturOrganisasiUI();
@@ -706,15 +854,18 @@
   }
 
   function fillFilterOptions() {
-    const fill = (id, idx, label) => {
+    const kw = document.getElementById('fltKanwil').value;
+    const fill = (id, idx, label, rows = allRows) => {
       const el = document.getElementById(id), cur = el.value;
-      const vals = [...new Set(allRows.map(r => r[idx]).filter(Boolean))].sort();
+      const vals = [...new Set(rows.map(r => r[idx]).filter(Boolean))].sort();
       el.innerHTML = `<option value="">${label}</option>` + vals.map(v => `<option>${escHtml(v)}</option>`).join('');
       el.value = vals.includes(cur) ? cur : '';
     };
     fill('fltAsesor', 1, 'Semua Asesor');
-    fill('fltUpt', 4, 'Semua UPT');
+    fill('fltKanwil', 107, 'Semua Kanwil');
+    fill('fltUpt', 4, 'Semua UPT', kw ? allRows.filter(r => r[107] === kw) : allRows);
     document.getElementById('fltUpt').classList.toggle('d-none', userTingkat === 'UPT');
+    document.getElementById('fltKanwil').classList.toggle('d-none', userTingkat !== 'DITJEN');
   }
 
   function setSort(key) {
@@ -793,7 +944,8 @@
   }
 
   function resetFilter() {
-    ['fltSearch', 'fltAsesor', 'fltUpt', 'fltKategori', 'fltEdit'].forEach(id => document.getElementById(id).value = '');
+    ['fltSearch', 'fltAsesor', 'fltKanwil', 'fltUpt', 'fltKategori', 'fltEdit'].forEach(id => document.getElementById(id).value = '');
+    fillFilterOptions();
     renderDataTable();
   }
 
@@ -844,7 +996,7 @@
       currentBatch = rows;
       currentPdfFilename = `Asesmen_IKPR_${awal}_sd_${akhir}.pdf`;
       currentPdfOrientation = 'portrait';
-      document.getElementById('pdfPreviewTitle').innerText = `Pratinjau ${rows.length} Asesmen IKP-R (${awal} s/d ${akhir}) - diunduh 1 data 1 file`;
+      document.getElementById('pdfPreviewTitle').innerText = `Pratinjau ${rows.length} Asesmen STAR-PK (${awal} s/d ${akhir}) - diunduh 1 data 1 file`;
       document.getElementById('pdfPaper').innerHTML = items.join('<div class="html2pdf__page-break"></div>');
       bootstrap.Modal.getOrCreateInstance(document.getElementById('pdfPreviewModal')).show();
     } finally {
@@ -879,7 +1031,7 @@
 
   function renderDataTable() {
     const q = document.getElementById('fltSearch').value.trim().toLowerCase();
-    const fa = document.getElementById('fltAsesor').value, fu = document.getElementById('fltUpt').value;
+    const fa = document.getElementById('fltAsesor').value, fu = document.getElementById('fltUpt').value, fkw = document.getElementById('fltKanwil').value;
     const fk = document.getElementById('fltKategori').value, fe = document.getElementById('fltEdit').value;
     const cutoff = fe ? Date.now() - parseInt(fe) * 86400000 : 0;
     const canBatch = userTingkat === 'UPT' && isPimpinanUI();
@@ -890,6 +1042,7 @@
     let rows = allRows.filter(r => {
       if (fa && r[1] !== fa) return false;
       if (fu && r[4] !== fu) return false;
+      if (fkw && r[107] !== fkw) return false;
       if (fk && r[103] !== fk) return false;
       if (cutoff && !(new Date(r[110]).getTime() >= cutoff)) return false;
       if (bAwal && String(r[7] || '') < bAwal) return false;
@@ -1058,7 +1211,7 @@
 
     currentPdfFilename = 'Asesmen_IKPR_' + d[3] + '_' + d[2] + '.pdf';
     currentPdfOrientation = 'portrait';
-    document.getElementById('pdfPreviewTitle').innerText = 'Pratinjau Asesmen IKP-R';
+    document.getElementById('pdfPreviewTitle').innerText = 'Pratinjau Asesmen STAR-PK';
     document.getElementById('pdfPaper').innerHTML = html;
     document.getElementById('pengesahanSlot').innerHTML = buildPengesahanHtml(null, d);
     bootstrap.Modal.getOrCreateInstance(document.getElementById('pdfPreviewModal')).show();
