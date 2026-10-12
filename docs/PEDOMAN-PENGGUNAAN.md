@@ -21,6 +21,9 @@ Satu pengguna dapat memiliki lebih dari satu **status penandatangan**: **Asesor*
 - Wali dan tenaga kesehatan dapat mengedit seluruh asesmen warga binaan di UPT tempat mereka bekerja.
 
 ## 3. Masuk dan Keluar
+
+![Halaman login](img/01-login.png)
+*Gambar: Halaman login*
 1. Buka alamat aplikasi (`https://star-pk.id`).
 2. Isi **Username** dan **Password**, lalu klik **Login**. Username dan password awal biasanya NIP; segera hubungi admin bila lupa.
 3. Untuk keluar, klik **Keluar** di pojok kanan atas.
@@ -28,15 +31,33 @@ Satu pengguna dapat memiliki lebih dari satu **status penandatangan**: **Asesor*
 Sesi login berlaku sekitar 12 jam. Setelah itu login ulang.
 
 ## 4. Mengenal Tampilan
+
+![Halaman Laman dan sidebar](img/02-laman.png)
+*Gambar: Halaman Laman dan sidebar*
+
+![Tampilan di ponsel](img/09-mobile-laman.png)
+*Gambar: Tampilan di ponsel*
+
+![Menu di ponsel (tombol ☰)](img/10-mobile-menu.png)
+*Gambar: Menu di ponsel (tombol ☰)*
 - **Sidebar (kiri)**: menu. Di ponsel, buka dengan tombol ☰ di bar atas.
 - **Bar atas**: nama pengguna, **Tanda Tangan Saya**, dan **Keluar**.
 - **Laman**: halaman awal dengan sapaan dan pintasan ke fitur asesmen.
 - Menu yang tampil mengikuti hak akses Anda.
 
 ## 5. Tanda Tangan Saya
+
+![Jendela Tanda Tangan Saya](img/07-ttd.png)
+*Gambar: Jendela Tanda Tangan Saya*
 Klik **Tanda Tangan Saya** di bar atas, lalu unggah atau gambar tanda tangan Anda. Tanda tangan ini otomatis muncul di bagian pengesahan PDF hasil asesmen.
 
 ## 6. Membuat Asesmen Baru
+
+![Formulir identitas dan Modul 0](img/06-form.png)
+*Gambar: Formulir identitas dan Modul 0*
+
+![Rekap skor dan pemilihan penandatangan](img/06b-rekap.png)
+*Gambar: Rekap skor dan pemilihan penandatangan*
 Menu: **Asesmen Rehabilitasi & Reedukasi → Asesmen Baru** (khusus tingkat UPT).
 
 1. **B.0 Identitas Narapidana**: isi nama, nomor register, dan data lainnya. Pilih **UPT/Kanwil** dari dropdown (UPT sendiri atau UPT dalam wilayah kerja Bapas Anda).
@@ -51,6 +72,9 @@ Menu: **Asesmen Rehabilitasi & Reedukasi → Asesmen Baru** (khusus tingkat UPT)
 Catatan: UPT/Kanwil tidak dapat diubah setelah data disimpan.
 
 ## 7. Melihat, Mencari, dan Mengedit Data
+
+![Daftar data asesmen](img/03-data.png)
+*Gambar: Daftar data asesmen*
 Menu: **Data Asesmen**.
 
 - **Cari** berdasarkan nama, nomor register, atau asesor.
@@ -60,11 +84,20 @@ Menu: **Data Asesmen**.
 - Tombol **Edit** muncul hanya bila Anda berhak mengedit data tersebut.
 
 ## 8. Cetak dan Pratinjau PDF
+
+![Pratinjau PDF hasil asesmen](img/05-pdf.png)
+*Gambar: Pratinjau PDF hasil asesmen*
 Pada baris data, klik tombol cetak/pratinjau untuk melihat hasil asesmen. Dari jendela pratinjau Anda dapat mencetak atau mengunduh PDF.
 
 Bagian pengesahan menampilkan tanda tangan: **Wali di kiri, Tenaga Kesehatan di tengah, Asesor di kanan**.
 
 ## 9. Fitur Kepala Bapas
+
+![Generate PDF massal](img/04-batch.png)
+*Gambar: Generate PDF massal*
+
+![Wilayah Kerja Bapas](img/08-wilayah.png)
+*Gambar: Wilayah Kerja Bapas*
 Hanya tampil bagi Kepala Bapas.
 
 **Generate PDF massal (1 data = 1 file PDF)**
@@ -105,3 +138,6 @@ Kepala Bapas dapat mengelola pengguna di UPT-nya.
 - Simpan data secara berkala dan periksa nomor register sebelum menyimpan.
 - Jaga kerahasiaan password dan jangan bagikan akun.
 - Selalu klik **Keluar** bila memakai perangkat bersama.
+
+---
+*Seluruh tangkapan layar memakai data contoh fiktif.*
