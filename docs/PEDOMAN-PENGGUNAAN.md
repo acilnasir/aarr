@@ -41,15 +41,16 @@ Sesi login berlaku sekitar 12 jam. Setelah itu login ulang.
 ![Menu di ponsel (tombol ☰)](img/10-mobile-menu.png)
 *Gambar: Menu di ponsel (tombol ☰)*
 - **Sidebar (kiri)**: menu. Di ponsel, buka dengan tombol ☰ di bar atas.
-- **Bar atas**: nama pengguna, **Tanda Tangan Saya**, dan **Keluar**.
+- **Bar atas**: nama pengguna dan **Keluar**.
 - **Laman**: halaman awal dengan sapaan dan pintasan ke fitur asesmen.
 - Menu yang tampil mengikuti hak akses Anda.
 
-## 5. Tanda Tangan Saya
+## 5. Profil Saya (Password dan Tanda Tangan)
 
-![Jendela Tanda Tangan Saya](img/07-ttd.png)
-*Gambar: Jendela Tanda Tangan Saya*
-Klik **Tanda Tangan Saya** di bar atas, lalu unggah atau gambar tanda tangan Anda. Tanda tangan ini otomatis muncul di bagian pengesahan PDF hasil asesmen.
+Buka menu **Profil Saya** di sidebar. Halaman ini berisi dua bagian:
+
+- **Ubah Password**: isi password lama, password baru (minimal 6 karakter), lalu ulangi password baru dan klik **Simpan Password**. Disarankan segera mengganti password awal.
+- **Tanda Tangan Saya**: unggah gambar tanda tangan (PNG/JPG), lalu klik **Simpan Tanda Tangan**. Tanda tangan ini otomatis muncul di bagian pengesahan PDF hasil asesmen.
 
 ## 6. Membuat Asesmen Baru
 

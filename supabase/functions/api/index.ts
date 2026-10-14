@@ -160,6 +160,12 @@ serve(async (req: Request) => {
       case "getMySignature":
         result = await getMySignature(session);
         break;
+      case "getMyPhoto":
+        result = await getMyPhoto(session);
+        break;
+      case "saveMyPhoto":
+        result = await saveMyPhoto(session, body.image);
+        break;
       case "saveMySignature":
         result = await saveMySignature(session, body.image);
         break;
@@ -663,6 +669,35 @@ async function saveMySignature(session: SessionPayload, image: unknown) {
     .eq("username", session.username);
   if (error) return { success: false, message: "Gagal menyimpan: " + error.message };
   return { success: true, message: image ? "Tanda tangan berhasil disimpan." : "Tanda tangan dihapus." };
+}
+
+const MAX_PHOTO_LENGTH = 200_000;
+
+async function getMyPhoto(session: SessionPayload) {
+  const { data, error } = await supabase
+    .from("users")
+    .select("foto")
+    .eq("username", session.username)
+    .maybeSingle();
+  if (error) return { success: false, message: error.message };
+  return { success: true, image: data?.foto ?? null };
+}
+
+async function saveMyPhoto(session: SessionPayload, image: unknown) {
+  if (image !== null && image !== undefined && image !== "") {
+    if (typeof image !== "string" || !/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(image)) {
+      return { success: false, message: "Format foto harus PNG atau JPEG." };
+    }
+    if (image.length > MAX_PHOTO_LENGTH) {
+      return { success: false, message: "Ukuran foto terlalu besar." };
+    }
+  }
+  const { error } = await supabase
+    .from("users")
+    .update({ foto: image || null })
+    .eq("username", session.username);
+  if (error) return { success: false, message: "Gagal menyimpan: " + error.message };
+  return { success: true, message: image ? "Foto berhasil disimpan." : "Foto dihapus." };
 }
 
 // Daftar calon penandatangan untuk UPT lokasi WBP (default: UPT pemanggil).
