@@ -106,7 +106,7 @@ Hanya tampil bagi Kepala Bapas.
 2. Centang data yang diinginkan (maksimal 50 data per proses).
 3. Klik **Generate PDF Terpilih**, tunggu pratinjau muncul, lalu unduh. Setiap data menjadi satu file bernama `Asesmen_IKPR_<noreg>_<nama>.pdf`.
 
-**Wilayah Kerja Bapas**: kelola daftar Lapas/Rutan/LPKA yang menjadi wilayah kerja Bapas, agar asesor Bapas dapat menilai warga binaan di UPT tersebut.
+**Wilayah Kerja Bapas** (menu Administrasi): kelola daftar Lapas/Rutan/LPKA yang menjadi wilayah kerja Bapas, agar asesor Bapas dapat menilai warga binaan di UPT tersebut.
 
 **Kunci aplikasi**: tombol untuk mengunci/membuka penginputan dan perubahan data. Saat terkunci, banner merah tampil dan data tidak dapat diubah.
 
