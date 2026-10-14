@@ -469,6 +469,17 @@
         <h5 class="m-0">Kelola User</h5>
         <button class="btn btn-sm btn-primary" onclick="openUserModal()">➕ Tambah User</button>
       </div>
+      <div class="row g-2 mb-2" id="userFilterBar">
+        <div class="col-12 col-md-4"><input type="search" id="fuSearch" class="form-control form-control-sm" placeholder="Cari username / nama / jabatan..." oninput="renderUserTable()"></div>
+        <div class="col-6 col-md-2" id="fuKanwilWrap"><select id="fuKanwil" class="form-select form-select-sm" onchange="onFuKanwilChange()"></select></div>
+        <div class="col-6 col-md-3" id="fuUptWrap"><select id="fuUpt" class="form-select form-select-sm" onchange="renderUserTable()"></select></div>
+        <div class="col-6 col-md-1" id="fuTingkatWrap"><select id="fuTingkat" class="form-select form-select-sm" onchange="renderUserTable()"><option value="">Tingkat</option><option>UPT</option><option>KANWIL</option><option>DITJEN</option></select></div>
+        <div class="col-6 col-md-2"><select id="fuStatus" class="form-select form-select-sm" onchange="renderUserTable()"><option value="">Semua status</option><option value="asesor">Asesor</option><option value="wali">Wali</option><option value="nakes">Tenaga Kesehatan</option><option value="__none">Tanpa status</option></select></div>
+        <div class="col-12 d-flex justify-content-between align-items-center small text-muted">
+          <span id="fuCount"></span>
+          <button type="button" class="btn btn-sm btn-link p-0" onclick="resetUserFilter()">Reset filter</button>
+        </div>
+      </div>
       <div class="table-responsive">
         <table class="table table-bordered table-hover align-middle">
           <thead class="table-dark"><tr><th>Username</th><th>Nama</th><th>Peran/Jabatan</th><th>Status</th><th>Tingkat</th><th>Unit</th><th>Aksi</th></tr></thead>
@@ -1665,17 +1676,69 @@
       if (uptRes.success) uptCache = uptRes.data || [];
       if (kanwilRes.success) kanwilCache = kanwilRes.data || [];
       if (!userRes.success) { tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger">${userRes.message}</td></tr>`; return; }
-      let users = userRes.data || [];
-      if (users.length === 0) { tbody.innerHTML = `<tr><td colspan="7" class="text-center">Belum ada data.</td></tr>`; return; }
-      tbody.innerHTML = users.map(u => `<tr>
-        <td>${esc(u.username)}</td><td>${esc(u.nama)}</td><td>${esc(u.peran)}</td><td>${(u.status_penandatangan || []).map(x => `<span class="badge bg-info text-dark me-1">${STATUS_LABEL[x] || esc(x)}</span>`).join() || '-'}</td><td>${esc(u.tingkat)}</td>
+      allUsers = userRes.data || [];
+      initUserFilter();
+      renderUserTable();
+    });
+  }
+
+  let allUsers = [];
+
+  function initUserFilter() {
+    const keep = id => document.getElementById(id).value;
+    const prev = { k: keep('fuKanwil'), u: keep('fuUpt') };
+    const isDitjen = userTingkat === 'DITJEN', isUpt = userTingkat === 'UPT';
+    document.getElementById('fuKanwilWrap').classList.toggle('d-none', !isDitjen);
+    document.getElementById('fuUptWrap').classList.toggle('d-none', isUpt);
+    document.getElementById('fuTingkatWrap').classList.toggle('d-none', isUpt);
+    document.getElementById('fuKanwil').innerHTML = '<option value="">Semua Kanwil</option>' +
+      kanwilCache.map(k => `<option value="${k.id}">${esc(k.nama)}</option>`).join('');
+    document.getElementById('fuKanwil').value = prev.k;
+    fillFuUpt(prev.u);
+  }
+
+  function fillFuUpt(selected) {
+    const kw = document.getElementById('fuKanwil').value;
+    const list = uptCache.filter(u => !kw || u.kanwil_id === kw);
+    const sel = document.getElementById('fuUpt');
+    sel.innerHTML = '<option value="">Semua UPT</option>' + list.map(u => `<option value="${u.id}">${esc(u.nama)}</option>`).join('');
+    sel.value = list.some(u => u.id === selected) ? selected : '';
+  }
+
+  function onFuKanwilChange() { fillFuUpt(''); renderUserTable(); }
+
+  function resetUserFilter() {
+    ['fuSearch', 'fuKanwil', 'fuUpt', 'fuTingkat', 'fuStatus'].forEach(id => document.getElementById(id).value = '');
+    fillFuUpt('');
+    renderUserTable();
+  }
+
+  function renderUserTable() {
+    const tbody = document.getElementById('userTableBody');
+    const q = document.getElementById('fuSearch').value.trim().toLowerCase();
+    const kw = document.getElementById('fuKanwil').value, upt = document.getElementById('fuUpt').value;
+    const tg = document.getElementById('fuTingkat').value, st = document.getElementById('fuStatus').value;
+    const uptKanwil = {}; uptCache.forEach(x => uptKanwil[x.id] = x.kanwil_id);
+    const users = allUsers.filter(u => {
+      if (q && !`${u.username} ${u.nama} ${u.peran}`.toLowerCase().includes(q)) return false;
+      if (tg && u.tingkat !== tg) return false;
+      if (upt && u.upt_id !== upt) return false;
+      if (kw && (u.tingkat === 'UPT' ? uptKanwil[u.upt_id] : u.kanwil_id) !== kw) return false;
+      const sts = u.status_penandatangan || [];
+      if (st === '__none') return sts.length === 0;
+      if (st && !sts.includes(st)) return false;
+      return true;
+    });
+    document.getElementById('fuCount').textContent = `Menampilkan ${users.length} dari ${allUsers.length} user`;
+    if (users.length === 0) { tbody.innerHTML = `<tr><td colspan="7" class="text-center">${allUsers.length ? 'Tidak ada user yang cocok dengan filter.' : 'Belum ada data.'}</td></tr>`; return; }
+    tbody.innerHTML = users.map(u => `<tr>
+        <td>${esc(u.username)}</td><td>${esc(u.nama)}</td><td>${esc(u.peran)}</td><td>${(u.status_penandatangan || []).map(x => `<span class="badge bg-info text-dark me-1">${STATUS_LABEL[x] || esc(x)}</span>`).join('') || '-'}</td><td>${esc(u.tingkat)}</td>
         <td>${esc((u.upt && u.upt.nama) || (u.kanwil && u.kanwil.nama) || '-')}</td>
         <td>
           <button class="btn btn-sm btn-primary" onclick="openUserModal('${u.username}')">✏️ Edit</button>
           <button class="btn btn-sm btn-danger" onclick="deleteUserRow('${u.username}')">🗑️ Hapus</button>
         </td>
       </tr>`).join('');
-    });
   }
 
   function uptSelectOptions(selectedId) {
