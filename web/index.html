@@ -134,7 +134,6 @@
       <button class="star-iconbtn" onclick="document.getElementById('appSection').classList.toggle('collapsed')" title="Menu"><i class="bi bi-list"></i></button>
       <div class="ms-auto d-flex align-items-center gap-2 flex-wrap justify-content-end">
         <span id="userInfo" class="star-user"></span>
-        <button id="btnTtdSaya" class="btn btn-sm btn-outline-light" onclick="openTtdModal()"><i class="bi bi-pen"></i> Tanda Tangan Saya</button>
         <button id="btnToggleLock" class="btn btn-sm d-none" onclick="toggleKunciAplikasi()"></button>
         <button class="btn btn-sm btn-warning" onclick="location.reload()"><i class="bi bi-box-arrow-right"></i> Keluar</button>
       </div>
@@ -174,6 +173,9 @@
     </li>
     <li class="nav-item d-none" id="tabUserContainer">
       <button class="nav-link fw-bold text-dark" data-bs-toggle="tab" data-bs-target="#tabUser" type="button" onclick="loadUserList()">👤 Kelola User</button>
+    </li>
+    <li class="nav-item" id="tabProfilContainer">
+      <button class="nav-link fw-bold text-dark" data-bs-toggle="tab" data-bs-target="#tabProfil" type="button" onclick="loadProfil()">🙍 Profil Saya</button>
     </li>
     <li class="nav-item d-none" id="tabDitjenContainer">
       <button class="nav-link fw-bold text-dark" data-bs-toggle="tab" data-bs-target="#tabDitjenProfile" type="button" onclick="loadDitjenProfileForm()">🏛️ Profil Ditjen</button>
@@ -411,7 +413,7 @@
               <div class="col-md-4"><label class="form-label">Tenaga Kesehatan</label><select class="form-select" id="sel_nakes"><option value="">-- Pilih --</option></select></div>
               <div class="col-md-4"><label class="form-label">Asesor</label><select class="form-select" id="sel_asesor"></select></div>
             </div>
-            <div class="form-text">Wali, tenaga kesehatan, dan asesor dapat mengisi dan saling mengedit asesmen ini. Asesor boleh dari UPT lokasi WBP atau Bapas yang mencakup wilayah kerjanya. Tanda tangan diunggah masing-masing user lewat tombol "Tanda Tangan Saya".</div>
+            <div class="form-text">Wali, tenaga kesehatan, dan asesor dapat mengisi dan saling mengedit asesmen ini. Asesor boleh dari UPT lokasi WBP atau Bapas yang mencakup wilayah kerjanya. Tanda tangan diunggah masing-masing user lewat menu "Profil Saya".</div>
 
             <hr class="mt-5">
             <button type="button" class="btn btn-primary btn-lg w-100 shadow" id="btnSimpan" onclick="submitData()">💾 SIMPAN DATA</button>
@@ -488,6 +490,42 @@
       </div>
     </div>
 
+    <!-- PROFIL SAYA -->
+    <div class="tab-pane fade" id="tabProfil">
+      <div class="row g-3">
+        <div class="col-lg-6">
+          <div class="card h-100"><div class="card-body">
+            <h6 class="fw-bold mb-3"><i class="bi bi-person-circle"></i> Akun Saya</h6>
+            <dl class="row mb-0 small">
+              <dt class="col-4">Nama</dt><dd class="col-8" id="pfNama">-</dd>
+              <dt class="col-4">Username</dt><dd class="col-8" id="pfUsername">-</dd>
+              <dt class="col-4">Jabatan</dt><dd class="col-8" id="pfJabatan">-</dd>
+              <dt class="col-4">Tingkat</dt><dd class="col-8" id="pfTingkat">-</dd>
+            </dl>
+            <hr>
+            <h6 class="fw-bold mb-3"><i class="bi bi-key"></i> Ubah Password</h6>
+            <label class="form-label">Password lama</label>
+            <input type="password" id="pwLama" class="form-control mb-2" autocomplete="current-password">
+            <label class="form-label">Password baru (minimal 6 karakter)</label>
+            <input type="password" id="pwBaru" class="form-control mb-2" autocomplete="new-password">
+            <label class="form-label">Ulangi password baru</label>
+            <input type="password" id="pwUlang" class="form-control mb-3" autocomplete="new-password">
+            <button class="btn btn-primary" onclick="ubahPassword()">Simpan Password</button>
+          </div></div>
+        </div>
+        <div class="col-lg-6">
+          <div class="card h-100"><div class="card-body">
+            <h6 class="fw-bold mb-3"><i class="bi bi-pen"></i> Tanda Tangan Saya</h6>
+            <p class="small text-muted">Unggah gambar tanda tangan (PNG/JPG). Latar transparan/putih paling baik. Gambar otomatis diperkecil.</p>
+            <input type="file" class="form-control mb-3" id="ttdFile" accept="image/png,image/jpeg" onchange="onTtdFile(this)">
+            <div class="border rounded p-2 text-center bg-white mb-3" style="min-height:110px;"><img id="ttdPreview" style="max-width:100%;max-height:150px;display:none;"><span id="ttdEmpty" class="text-muted small">Belum ada tanda tangan</span></div>
+            <button class="btn btn-primary" id="btnTtdSimpan" onclick="simpanTtd()">Simpan Tanda Tangan</button>
+            <button class="btn btn-outline-danger" onclick="hapusTtd()">Hapus</button>
+          </div></div>
+        </div>
+      </div>
+    </div>
+
     <!-- PROFIL DITJEN (SINGLETON) -->
     <div class="tab-pane fade" id="tabDitjenProfile">
       <h5 class="mb-3">Profil Direktorat Jenderal Pemasyarakatan</h5>
@@ -509,22 +547,6 @@
 </div>
 
 <!-- MODAL GENERIK UNTUK KELOLA WILAYAH / UPT / USER -->
-<div class="modal fade" id="ttdModal" tabindex="-1">
-  <div class="modal-dialog"><div class="modal-content">
-    <div class="modal-header"><h5 class="modal-title">✍️ Tanda Tangan Saya</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-    <div class="modal-body">
-      <p class="small text-muted">Unggah gambar tanda tangan (PNG/JPG). Latar transparan/putih paling baik. Gambar otomatis diperkecil.</p>
-      <input type="file" class="form-control mb-3" id="ttdFile" accept="image/png,image/jpeg" onchange="onTtdFile(this)">
-      <div class="border rounded p-2 text-center bg-white" style="min-height:110px;"><img id="ttdPreview" style="max-width:100%;max-height:150px;display:none;"><span id="ttdEmpty" class="text-muted small">Belum ada tanda tangan</span></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline-danger me-auto" onclick="hapusTtd()">Hapus</button>
-      <button class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
-      <button class="btn btn-primary" id="btnTtdSimpan" onclick="simpanTtd()">Simpan</button>
-    </div>
-  </div></div>
-</div>
-
 <div class="modal fade" id="adminModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -606,7 +628,8 @@
       { label: 'Kelola UPT', icon: 'bi-bank', box: 'tabUptContainer' },
       { label: 'Kelola User', icon: 'bi-person-gear', box: 'tabUserContainer' },
       { label: 'Profil Ditjen', icon: 'bi-building', box: 'tabDitjenContainer' }
-    ]}
+    ]},
+    { label: 'Profil Saya', icon: 'bi-person-circle', box: 'tabProfilContainer' }
   ];
   const sideBtn = it => it.tab ? document.querySelector('#mainTabs [data-bs-target="#tabDashboard"]') : document.getElementById(it.box).querySelector('button');
   const sideHidden = it => { const el = it.tab ? sideBtn(it).parentElement : document.getElementById(it.box); return el.classList.contains('d-none') || el.style.display === 'none'; };
@@ -1316,12 +1339,26 @@
     document.getElementById('ttdEmpty').style.display = src ? 'none' : 'inline';
   }
 
-  function openTtdModal() {
+  function loadProfil() {
+    document.getElementById('pfNama').innerText = asr || '-';
+    document.getElementById('pfUsername').innerText = sessionUsername || '-';
+    document.getElementById('pfJabatan').innerText = userJabatan || '-';
+    document.getElementById('pfTingkat').innerText = { UPT: 'UPT', KANWIL: 'Kanwil', DITJEN: 'Ditjenpas' }[userTingkat] || '-';
+    ['pwLama', 'pwBaru', 'pwUlang', 'ttdFile'].forEach(id => document.getElementById(id).value = '');
     ttdDraft = null;
-    document.getElementById('ttdFile').value = '';
     showTtdPreview(null);
-    bootstrap.Modal.getOrCreateInstance(document.getElementById('ttdModal')).show();
     callApi('getMySignature').then(r => { if (r.success && !ttdDraft) showTtdPreview(r.image); });
+  }
+
+  function ubahPassword() {
+    const lama = document.getElementById('pwLama').value, baru = document.getElementById('pwBaru').value, ulang = document.getElementById('pwUlang').value;
+    if (!lama || !baru) return alert('Password lama dan baru wajib diisi.');
+    if (baru.length < 6) return alert('Password baru minimal 6 karakter.');
+    if (baru !== ulang) return alert('Ulangi password baru tidak sama.');
+    callApi('changePassword', { currentPassword: lama, newPassword: baru }).then(r => {
+      alert(r.message);
+      if (r.success) ['pwLama', 'pwBaru', 'pwUlang'].forEach(id => document.getElementById(id).value = '');
+    });
   }
 
   function onTtdFile(input) {
@@ -1349,7 +1386,7 @@
     if (!ttdDraft) return alert('Pilih file gambar terlebih dahulu.');
     callApi('saveMySignature', { image: ttdDraft }).then(r => {
       alert(r.message);
-      if (r.success) { bootstrap.Modal.getInstance(document.getElementById('ttdModal')).hide(); loadPenandatangan(); }
+      if (r.success) { document.getElementById('ttdFile').value = ''; ttdDraft = null; loadPenandatangan(); }
     });
   }
 
