@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Presensi Klien - STAR-PK</title>
+  <link rel="icon" href="logo-starpk.png">
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 15px; max-width: 500px; margin: 0 auto; background: #eef2f5; color: #333; }
+    .card { background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,.08); }
+    .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #F5B800; padding-bottom: 10px; }
+    .header img { height: 60px; }
+    .header h2 { margin: 6px 0 0; color: #0E203C; font-size: 20px; }
+    .header p { margin: 5px 0 0; font-size: 12px; color: #666; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 13px; color: #2c3e50; }
+    input, textarea, button, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; font-family: inherit; }
+    .id-box { display: flex; gap: 8px; }
+    .id-box input { flex: 1; }
+    .btn-check { width: 100px; background: #0E203C; color: #fff; border: none; font-weight: bold; cursor: pointer; }
+    .info-box { background: #e8f8f5; border: 1px solid #a3e4d7; border-radius: 6px; padding: 10px; margin-top: 8px; font-size: 13px; color: #117864; display: none; }
+    .info-box.err { background: #fdecea; border-color: #f5b7b1; color: #922b21; }
+    .camera-container { width: 100%; background: #000; border-radius: 8px; overflow: hidden; margin-top: 5px; }
+    #webcam { width: 100%; height: auto; display: block; min-height: 160px; }
+    .camera-controls { display: flex; gap: 8px; margin-top: 8px; }
+    .btn-cam { flex: 1; font-weight: bold; cursor: pointer; border: none; color: #fff; }
+    .btn-toggle { background: #3498db; }
+    .btn-capture { background: #e67e22; }
+    button[type="submit"] { background: #27ae60; color: #fff; border: none; font-weight: bold; cursor: pointer; font-size: 16px; margin-top: 10px; height: 45px; }
+    button:disabled { background: #bdc3c7; cursor: not-allowed; }
+    #preview { max-width: 100%; margin-top: 10px; display: none; border: 1px solid #ddd; border-radius: 6px; }
+    #fileInfo { font-size: 11px; color: #555; margin-top: 5px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <img src="logo-starpk.png" alt="STAR-PK">
+      <h2>PRESENSI KLIEN BAPAS</h2>
+      <p>Pelaporan Lokasi Mandiri</p>
+    </div>
+
+    <form id="formPresensi">
+      <div class="form-group">
+        <label>No. Register Klien:</label>
+        <div class="id-box">
+          <input type="text" id="noRegister" placeholder="Masukkan No. Register" autocomplete="off" required>
+          <button type="button" class="btn-check" id="btnCek">Cek</button>
+        </div>
+        <div class="info-box" id="infoBox"></div>
+        <select id="uptPilih" style="display:none; margin-top:8px;"></select>
+      </div>
+
+      <div class="form-group">
+        <label>Ambil Foto Presensi:</label>
+        <div class="camera-container"><video id="webcam" autoplay playsinline muted></video></div>
+        <div class="camera-controls">
+          <button type="button" class="btn-cam btn-toggle" id="btnToggleCam">🔄 Ganti Kamera</button>
+          <button type="button" class="btn-cam btn-capture" id="btnCapture">📸 Ambil Foto</button>
+        </div>
+        <img id="preview" alt="Preview Foto">
+        <div id="fileInfo"></div>
+      </div>
+
+      <div class="form-group">
+        <label>Pekerjaan Sekarang:</label>
+        <input type="text" id="pekerjaan" placeholder="Contoh: Sopir, Buruh, Pedagang" maxlength="200" required>
+      </div>
+      <div class="form-group">
+        <label>Alamat Domisili Sekarang:</label>
+        <textarea id="alamat" rows="2" placeholder="Alamat lengkap tempat tinggal saat ini" maxlength="400" required></textarea>
+      </div>
+      <div class="form-group">
+        <label>Permasalahan / Kendala (Bila Ada):</label>
+        <textarea id="kendala" rows="2" placeholder="Isi 'Tidak ada' jika lancar" maxlength="400"></textarea>
+      </div>
+
+      <button type="submit" id="btnSubmit">KIRIM LAPORAN PRESENSI</button>
+    </form>
+    <p id="statusMsg" style="margin-top:15px; text-align:center; font-weight:bold; font-size:13px;"></p>
+  </div>
+
+  <script>
+    const API_URL = "https://nicvhbztcjdmralzgqqm.functions.supabase.co/api";
+    let foto = "", stream = null, facing = "user", klienOk = false;
+    const $ = id => document.getElementById(id);
+    const video = $('webcam');
+
+    function api(action, data) {
+      return fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(Object.assign({ action }, data)) }).then(r => r.json());
+    }
+
+    async function startCamera() {
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: facing } } }); }
+      catch (e) {
+        try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing } }); }
+        catch (e2) { $('statusMsg').style.color = 'red'; $('statusMsg').innerText = 'Kamera tidak dapat diakses. Izinkan akses kamera di browser.'; return; }
+      }
+      video.srcObject = stream;
+    }
+    window.onload = startCamera;
+    $('btnToggleCam').onclick = () => { facing = facing === 'user' ? 'environment' : 'user'; startCamera(); };
+
+    function setInfo(html, err) { const b = $('infoBox'); b.className = 'info-box' + (err ? ' err' : ''); b.innerHTML = html; b.style.display = 'block'; }
+    const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    $('noRegister').addEventListener('input', () => { klienOk = false; $('infoBox').style.display = 'none'; $('uptPilih').style.display = 'none'; });
+
+    $('btnCek').onclick = async () => {
+      const nr = $('noRegister').value.trim();
+      if (!nr) return alert('Masukkan No. Register terlebih dahulu.');
+      $('btnCek').disabled = true; $('btnCek').innerText = '...';
+      try {
+        const r = await api('publicCekKlien', { no_register: nr });
+        const sel = $('uptPilih');
+        if (!r.success || !r.found) { klienOk = false; sel.style.display = 'none'; setInfo('No. Register tidak terdaftar. Hubungi petugas Bapas.', true); }
+        else {
+          klienOk = true;
+          sel.innerHTML = r.matches.map(m => `<option value="${esc(m.upt_id)}">${esc(m.upt)}</option>`).join('');
+          sel.style.display = r.matches.length > 1 ? 'block' : 'none';
+          const m = r.matches[0];
+          setInfo(`<strong>Nama:</strong> ${esc(m.nama)}<br><strong>Wilayah Izin:</strong> ${esc(m.wilayah)}` + (r.matches.length > 1 ? '<br>Pilih UPT Anda di bawah.' : ''));
+        }
+      } catch (e) { setInfo('Gagal terhubung ke server.', true); }
+      $('btnCek').disabled = false; $('btnCek').innerText = 'Cek';
+    };
+
+    $('btnCapture').onclick = () => {
+      if (!video.srcObject || !video.videoWidth) return alert('Kamera belum siap.');
+      const MAX = 800;
+      let w = video.videoWidth, h = video.videoHeight;
+      const k = Math.min(1, MAX / Math.max(w, h)); w = Math.round(w * k); h = Math.round(h * k);
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const ctx = c.getContext('2d');
+      if (facing === 'user') { ctx.translate(w, 0); ctx.scale(-1, 1); }
+      ctx.drawImage(video, 0, 0, w, h);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.fillStyle = 'rgba(0,0,0,.7)'; ctx.fillRect(0, h - 40, w, 40);
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 14px Arial';
+      ctx.fillText(`${$('noRegister').value.trim()} | ${new Date().toLocaleString('id-ID')}`, 12, h - 15);
+      foto = c.toDataURL('image/jpeg', 0.6);
+      $('preview').src = foto; $('preview').style.display = 'block';
+      $('fileInfo').innerText = `Foto tersimpan (${Math.round(foto.length * 0.75 / 1024)} KB)`;
+    };
+
+    $('formPresensi').addEventListener('submit', async e => {
+      e.preventDefault();
+      const msg = $('statusMsg'), btn = $('btnSubmit');
+      if (!klienOk) return alert('Klik "Cek" untuk memverifikasi No. Register Anda terlebih dahulu.');
+      if (!foto) return alert('Harap ambil foto terlebih dahulu.');
+      btn.disabled = true; msg.style.color = '#333'; msg.innerText = 'Mengambil lokasi GPS...';
+      let baterai = null;
+      try { if (navigator.getBattery) baterai = Math.round((await navigator.getBattery()).level * 100); } catch (e) {}
+      navigator.geolocation.getCurrentPosition(async pos => {
+        msg.innerText = 'Mengirim laporan...';
+        try {
+          const sel = $('uptPilih');
+          const r = await api('publicPresensi', {
+            no_register: $('noRegister').value.trim(),
+            upt_id: sel.style.display !== 'none' ? sel.value : undefined,
+            latitude: pos.coords.latitude, longitude: pos.coords.longitude, baterai,
+            pekerjaan: $('pekerjaan').value, alamat_domisili: $('alamat').value, kendala: $('kendala').value, foto
+          });
+          if (!r.success) throw new Error(r.message || 'Gagal menyimpan.');
+          msg.style.color = 'green'; msg.innerText = 'Presensi berhasil terkirim. Terima kasih.';
+          $('formPresensi').reset(); $('preview').style.display = 'none'; $('fileInfo').innerText = ''; $('infoBox').style.display = 'none'; $('uptPilih').style.display = 'none';
+          foto = ''; klienOk = false;
+        } catch (err) { msg.style.color = 'red'; msg.innerText = 'Gagal mengirim: ' + err.message; }
+        btn.disabled = false;
+      }, () => {
+        msg.style.color = 'red'; msg.innerText = 'Gagal mengambil lokasi. Aktifkan GPS dan izinkan akses lokasi.'; btn.disabled = false;
+      }, { enableHighAccuracy: true, timeout: 20000 });
+    });
+  </script>
+</body>
+</html>

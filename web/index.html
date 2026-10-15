@@ -10,6 +10,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
@@ -206,6 +208,9 @@
     </li>
     <li class="nav-item" id="tabProfilKlienContainer">
       <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabProfilKlien" type="button" onclick="loadProfilKlienTab()">Profil Klien</button>
+    </li>
+    <li class="nav-item" id="tabPelacakanContainer">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabPelacakan" type="button" onclick="loadPelacakan()">Pelacakan Klien</button>
     </li>
     <li class="nav-item">
       <button class="nav-link fw-bold text-primary" data-bs-toggle="tab" data-bs-target="#tabDashboard" type="button" onclick="loadDataList()">📋 Data Asesmen</button>
@@ -546,6 +551,26 @@
       <div id="pkDetail" class="text-muted">Pilih klien untuk melihat profil.</div>
     </div>
 
+    <!-- PENGAWASAN: PELACAKAN KLIEN -->
+    <div class="tab-pane fade" id="tabPelacakan">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <h5 class="m-0">Pelacakan Klien <small class="text-muted fs-6" id="plCount"></small></h5>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-outline-primary" onclick="salinLinkPresensi()"><i class="bi bi-link-45deg"></i> Salin tautan presensi klien</button>
+          <button class="btn btn-sm btn-outline-secondary" onclick="loadPelacakan()"><i class="bi bi-arrow-clockwise"></i> Muat ulang</button>
+        </div>
+      </div>
+      <div class="row g-3">
+        <div class="col-lg-8"><div id="plMap" style="height:440px;border-radius:8px;border:1px solid #dee2e6;"></div>
+          <div class="small text-muted mt-1"><span class="text-success">●</span> Dalam wilayah izin &nbsp; <span class="text-danger">●</span> Di luar wilayah &nbsp; <span class="text-primary">●</span> Tanpa batas wilayah &nbsp; <span class="text-secondary">●</span> Belum presensi (tidak tampil di peta)</div></div>
+        <div class="col-lg-4">
+          <input type="search" id="plSearch" class="form-control form-control-sm mb-2" placeholder="Cari nama / no register..." oninput="renderPelacakanList()">
+          <div id="plList" class="list-group" style="max-height:440px;overflow:auto;"></div>
+        </div>
+      </div>
+      <div id="plDetail" class="mt-3"></div>
+    </div>
+
     <!-- KELOLA USER -->
     <div class="tab-pane fade" id="tabUser">
       <div class="d-flex justify-content-between align-items-center mb-3">
@@ -701,7 +726,6 @@
     { nama: 'Penelitian Kemasyarakatan (Litmas)', icon: 'bi-journal-text', aktif: false },
     { nama: 'Pendampingan', icon: 'bi-people', aktif: false },
     { nama: 'Pembimbingan', icon: 'bi-person-check', aktif: false },
-    { nama: 'Pengawasan', icon: 'bi-eye', aktif: false },
     { nama: 'Sidang TPP', icon: 'bi-hammer', aktif: false }
   ];
   const SIDE_MENU = [
@@ -709,6 +733,9 @@
     { label: 'Registrasi', icon: 'bi-person-vcard', children: [
       { label: 'Data Klien', icon: 'bi-people', box: 'tabKlienContainer' },
       { label: 'Profil Klien', icon: 'bi-person-lines-fill', box: 'tabProfilKlienContainer' }
+    ]},
+    { label: 'Pengawasan', icon: 'bi-eye', children: [
+      { label: 'Pelacakan Klien', icon: 'bi-geo-alt', box: 'tabPelacakanContainer' }
     ]},
     { label: 'Asesmen Rehabilitasi & Reedukasi', icon: 'bi-clipboard2-pulse', children: [
       { label: 'Data Asesmen', icon: 'bi-table', box: 'tabDashboard', tab: true },
@@ -759,7 +786,7 @@
     document.getElementById('welGreet').innerText = 'Selamat ' + (hr < 11 ? 'pagi' : hr < 15 ? 'siang' : hr < 18 ? 'sore' : 'malam');
     document.getElementById('welNama').innerText = asr;
     document.getElementById('welInfo').innerText = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) + (userJabatan ? ' · ' + userJabatan : '') + ' · ' + ({ UPT: 'UPT', KANWIL: 'Kanwil', DITJEN: 'Ditjenpas' }[userTingkat] || '');
-    document.getElementById('berandaCards').innerHTML = `<div class="col-md-6 col-xl-4"><div class="mod-card" onclick="sideBtn(SIDE_MENU[1].children[0]).click()"><div class="ic"><i class="bi bi-person-vcard"></i></div><div><div class="fw-bold" style="color:#0E203C;">Registrasi</div><small class="text-muted">Database dan profil klien Balai Pemasyarakatan</small></div></div></div><div class="col-md-6 col-xl-4"><div class="mod-card" onclick="sideBtn(SIDE_MENU[2].children[0]).click()"><div class="ic"><i class="bi bi-clipboard2-pulse"></i></div><div><div class="fw-bold" style="color:#0E203C;">Asesmen Rehabilitasi dan Reedukasi</div><small class="text-muted">Input, kelola, dan cetak hasil asesmen warga binaan</small></div></div></div>`;
+    document.getElementById('berandaCards').innerHTML = `<div class="col-md-6 col-xl-4"><div class="mod-card" onclick="sideBtn(SIDE_MENU[1].children[0]).click()"><div class="ic"><i class="bi bi-person-vcard"></i></div><div><div class="fw-bold" style="color:#0E203C;">Registrasi</div><small class="text-muted">Database dan profil klien Balai Pemasyarakatan</small></div></div></div><div class="col-md-6 col-xl-4"><div class="mod-card" onclick="sideBtn(SIDE_MENU[2].children[0]).click()"><div class="ic"><i class="bi bi-eye"></i></div><div><div class="fw-bold" style="color:#0E203C;">Pengawasan</div><small class="text-muted">Pelacakan lokasi dan presensi klien</small></div></div></div><div class="col-md-6 col-xl-4"><div class="mod-card" onclick="sideBtn(SIDE_MENU[3].children[0]).click()"><div class="ic"><i class="bi bi-clipboard2-pulse"></i></div><div><div class="fw-bold" style="color:#0E203C;">Asesmen Rehabilitasi dan Reedukasi</div><small class="text-muted">Input, kelola, dan cetak hasil asesmen warga binaan</small></div></div></div>`;
     syncSidebar();
     loadFoto();
   }
@@ -1669,6 +1696,140 @@
           ${sec('Kontak', row('Alamat', k.alamat) + row('No HP', k.no_hp) + row('Nama Penjamin', k.nama_penjamin) + row('No HP Penjamin', k.no_hp_penjamin))}
           ${sec('Perkara', row('Perkara Tindak Pidana', k.perkara) + row('Pasal Pelanggaran', k.pasal) + row('Lama Pidana', k.lama_pidana) + row('Asal Instansi', k.asal_instansi) + row('UPT', k.upt ? k.upt.nama : ''))}
         </div></div></div></div>`;
+    });
+  }
+
+  // ---------------- PENGAWASAN: PELACAKAN KLIEN ----------------
+  let plMap = null, plLayer = null, plData = [], plSel = null, plCanManage = false;
+
+  function hitungJarakKm(a, b, c, d) {
+    const R = 6371, rad = x => x * Math.PI / 180, dLa = rad(c - a), dLo = rad(d - b);
+    const h = Math.sin(dLa / 2) ** 2 + Math.cos(rad(a)) * Math.cos(rad(c)) * Math.sin(dLo / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  }
+  // Status: 'dalam' | 'luar' | 'bebas' (tanpa batas wilayah) | 'belum' (belum presensi)
+  function plStatus(k, t) {
+    if (!t) return 'belum';
+    if (k.lat_pusat == null || k.long_pusat == null || !k.radius_km) return 'bebas';
+    return hitungJarakKm(k.lat_pusat, k.long_pusat, t.latitude, t.longitude) <= k.radius_km ? 'dalam' : 'luar';
+  }
+  const PL_WARNA = { dalam: '#198754', luar: '#dc3545', bebas: '#0d6efd', belum: '#6c757d' };
+  const PL_LABEL = { dalam: 'Dalam wilayah izin', luar: 'DI LUAR wilayah izin', bebas: 'Tanpa batas wilayah', belum: 'Belum presensi' };
+  const fmtWaktuPl = t => t ? new Date(t).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+
+  function salinLinkPresensi() {
+    const url = new URL('presensi.html', location.href).href;
+    (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(() => alert('Tautan disalin:\n' + url), () => prompt('Salin tautan presensi klien:', url));
+  }
+
+  function loadPelacakan() {
+    if (!plMap) {
+      plMap = L.map('plMap').setView([-2.5, 118], 5);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(plMap);
+      plLayer = L.layerGroup().addTo(plMap);
+    }
+    setTimeout(() => plMap.invalidateSize(), 250);
+    return callApi('listLokasiKlien').then(r => {
+      if (!r.success) { document.getElementById('plList').innerHTML = `<div class="text-danger p-2">${escHtml(r.message)}</div>`; return; }
+      plData = r.data || []; plCanManage = !!r.can_manage;
+      renderPelacakan(true);
+      if (plSel && plData.some(k => k.id === plSel)) bukaDetailPelacakan(plSel, false);
+    });
+  }
+
+  function renderPelacakan(fit) {
+    plLayer.clearLayers();
+    const pts = [];
+    plData.forEach(k => {
+      const t = k.terakhir, st = plStatus(k, t);
+      if (k.lat_pusat != null && k.long_pusat != null && k.radius_km) {
+        L.circle([k.lat_pusat, k.long_pusat], { radius: k.radius_km * 1000, color: PL_WARNA[st === 'belum' ? 'bebas' : st], weight: 1, fillOpacity: 0.05, interactive: false }).addTo(plLayer);
+      }
+      if (!t) return;
+      pts.push([t.latitude, t.longitude]);
+      L.circleMarker([t.latitude, t.longitude], { radius: 9, color: '#fff', weight: 2, fillColor: PL_WARNA[st], fillOpacity: 1 })
+        .bindTooltip(`${escHtml(k.nama)} (${escHtml(k.no_register)})`).on('click', () => bukaDetailPelacakan(k.id, true)).addTo(plLayer);
+    });
+    if (fit && pts.length) plMap.fitBounds(pts, { padding: [40, 40], maxZoom: 15 });
+    renderPelacakanList();
+  }
+
+  function renderPelacakanList() {
+    const q = document.getElementById('plSearch').value.trim().toLowerCase();
+    const rows = plData.filter(k => !q || (k.nama + ' ' + k.no_register).toLowerCase().includes(q));
+    const urut = { luar: 0, dalam: 1, bebas: 2, belum: 3 };
+    rows.sort((a, b) => urut[plStatus(a, a.terakhir)] - urut[plStatus(b, b.terakhir)] || a.nama.localeCompare(b.nama));
+    document.getElementById('plCount').innerText = `(${plData.filter(k => k.terakhir).length} dari ${plData.length} klien sudah presensi)`;
+    document.getElementById('plList').innerHTML = rows.length ? rows.map(k => {
+      const st = plStatus(k, k.terakhir);
+      return `<button type="button" class="list-group-item list-group-item-action ${k.id === plSel ? 'active' : ''}" onclick="bukaDetailPelacakan('${k.id}', true)">
+        <div class="d-flex justify-content-between"><span class="fw-semibold">${escHtml(k.nama)}</span><span style="color:${k.id === plSel ? '#fff' : PL_WARNA[st]}">●</span></div>
+        <small>${escHtml(k.no_register)} · ${k.terakhir ? fmtWaktuPl(k.terakhir.waktu) : 'belum presensi'}</small></button>`;
+    }).join('') : '<div class="text-muted p-2">Belum ada klien.</div>';
+  }
+
+  function bukaDetailPelacakan(id, fokus) {
+    plSel = id;
+    const k = plData.find(x => x.id === id);
+    if (!k) return;
+    renderPelacakanList();
+    const t = k.terakhir, st = plStatus(k, t);
+    if (fokus && t) plMap.setView([t.latitude, t.longitude], Math.max(plMap.getZoom(), 15));
+    const box = document.getElementById('plDetail');
+    const jarak = t && st !== 'bebas' && st !== 'belum' ? hitungJarakKm(k.lat_pusat, k.long_pusat, t.latitude, t.longitude).toFixed(2) + ' km dari titik pusat' : '';
+    box.innerHTML = `<div class="card"><div class="card-body">
+      <div class="d-flex flex-wrap justify-content-between gap-2">
+        <div><h5 class="mb-0">${escHtml(k.nama)}</h5><div class="text-muted">${escHtml(k.no_register)} · HP ${escHtml(k.no_hp || '-')}${userTingkat !== 'UPT' ? ' · ' + escHtml(k.upt ? k.upt.nama : '') : ''}</div></div>
+        <div><span class="badge" style="background:${PL_WARNA[st]}">${PL_LABEL[st]}</span></div>
+      </div>
+      <div class="row g-3 mt-1">
+        <div class="col-md-4 text-center" id="plFotoBox">${t ? '<span class="text-muted">Memuat foto...</span>' : '<span class="text-muted">Belum ada foto presensi.</span>'}</div>
+        <div class="col-md-8">
+          ${t ? `<table class="table table-sm table-borderless mb-2"><tbody>
+            <tr><th class="text-muted" style="width:150px">Presensi terakhir</th><td>${fmtWaktuPl(t.waktu)}</td></tr>
+            <tr><th class="text-muted">Koordinat</th><td>${t.latitude.toFixed(6)}, ${t.longitude.toFixed(6)} <a target="_blank" rel="noopener" href="https://www.google.com/maps?q=${t.latitude},${t.longitude}">Buka di Google Maps</a>${jarak ? '<br><small class="text-muted">' + jarak + '</small>' : ''}</td></tr>
+            <tr><th class="text-muted">Baterai</th><td>${t.baterai == null ? '-' : t.baterai + '%'}</td></tr>
+            <tr><th class="text-muted">Pekerjaan</th><td>${escHtml(t.pekerjaan || '-')}</td></tr>
+            <tr><th class="text-muted">Alamat domisili</th><td>${escHtml(t.alamat_domisili || '-')}</td></tr>
+            <tr><th class="text-muted">Kendala</th><td>${escHtml(t.kendala || '-')}</td></tr></tbody></table>` : ''}
+          <div class="small"><b>Wilayah izin:</b> ${escHtml(k.wilayah_izin || '-')}${k.radius_km ? ` (pusat ${k.lat_pusat}, ${k.long_pusat}; radius ${k.radius_km} km)` : ' (belum ada batas radius)'}
+            ${plCanManage ? ` <button class="btn btn-sm btn-outline-secondary py-0" onclick="aturWilayahKlien('${k.id}')"><i class="bi bi-pencil"></i> Atur</button>` : ''}</div>
+        </div>
+      </div>
+      <h6 class="fw-bold mt-3">Riwayat presensi</h6>
+      <div id="plRiwayat" class="table-responsive text-muted">Memuat...</div>
+    </div></div>`;
+    if (t) callApi('getFotoPresensi', { id: t.id }).then(r => {
+      const fb = document.getElementById('plFotoBox');
+      if (plSel === id && fb) fb.innerHTML = r.success && r.foto ? `<img src="${r.foto}" class="img-fluid rounded" alt="Foto presensi">` : '<span class="text-muted">Foto tidak tersedia.</span>';
+    });
+    callApi('listRiwayatPresensi', { klien_id: id }).then(r => {
+      const rb = document.getElementById('plRiwayat');
+      if (plSel !== id || !rb) return;
+      if (!r.success) { rb.innerHTML = `<span class="text-danger">${escHtml(r.message)}</span>`; return; }
+      rb.innerHTML = r.data.length ? `<table class="table table-sm table-striped mb-0"><thead><tr><th>Waktu</th><th>Koordinat</th><th>Pekerjaan</th><th>Kendala</th><th>Status</th></tr></thead><tbody>${r.data.map(p => {
+        const s2 = plStatus(k, p);
+        return `<tr><td class="text-nowrap">${fmtWaktuPl(p.waktu)}</td><td><a target="_blank" rel="noopener" href="https://www.google.com/maps?q=${p.latitude},${p.longitude}">${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}</a></td><td>${escHtml(p.pekerjaan || '-')}</td><td>${escHtml(p.kendala || '-')}</td><td><span style="color:${PL_WARNA[s2]}">●</span> ${PL_LABEL[s2]}</td></tr>`;
+      }).join('')}</tbody></table>` : 'Belum ada riwayat.';
+    });
+    box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function aturWilayahKlien(id) {
+    const k = plData.find(x => x.id === id);
+    const w = prompt('Nama wilayah izin (mis. Kabupaten Banyumas):', k.wilayah_izin || '');
+    if (w === null) return;
+    const c = prompt('Titik pusat "latitude, longitude" (mis. -7.4243, 109.2391). Kosongkan jika tanpa batas radius:', k.lat_pusat != null ? k.lat_pusat + ', ' + k.long_pusat : '');
+    if (c === null) return;
+    let lat = '', lng = '', rad = '';
+    if (c.trim()) {
+      [lat, lng] = c.split(',').map(x => x.trim());
+      rad = prompt('Radius wilayah izin (km):', k.radius_km || '');
+      if (rad === null) return;
+    }
+    callApi('saveWilayahKlien', { id, payload: { wilayah_izin: w, lat_pusat: lat, long_pusat: lng, radius_km: rad } }).then(r => {
+      alert(r.message);
+      if (r.success) loadPelacakan();
     });
   }
 
