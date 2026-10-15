@@ -129,6 +129,10 @@ serve(async (req: Request) => {
       return json(result);
     }
 
+    // Aksi publik untuk halaman presensi klien (tanpa login, hanya data minimal).
+    if (action === "publicCekKlien") return json(await publicCekKlien(body.no_register));
+    if (action === "publicPresensi") return json(await publicPresensi(body));
+
     // Semua aksi lain memerlukan token sesi yang valid.
     const session = await verifyToken(body.token);
     if (!session) {
@@ -249,6 +253,37 @@ serve(async (req: Request) => {
         break;
       case "deleteUser":
         result = await deleteUser(session, body.username);
+        break;
+
+      // --- Modul Registrasi: klien Bapas ---
+      case "listKlien":
+        result = await listKlien(session);
+        break;
+      case "getKlien":
+        result = await getKlien(session, body.id);
+        break;
+      case "createKlien":
+        result = await createKlien(session, body.payload);
+        break;
+      case "updateKlien":
+        result = await updateKlien(session, body.id, body.payload);
+        break;
+      case "deleteKlien":
+        result = await deleteKlien(session, body.id);
+        break;
+
+      // --- Modul Pengawasan: pelacakan klien ---
+      case "listLokasiKlien":
+        result = await listLokasiKlien(session);
+        break;
+      case "listRiwayatPresensi":
+        result = await listRiwayatPresensi(session, body.klien_id);
+        break;
+      case "getFotoPresensi":
+        result = await getFotoPresensi(session, body.id);
+        break;
+      case "saveWilayahKlien":
+        result = await saveWilayahKlien(session, body.id, body.payload);
         break;
 
       default:
@@ -1386,4 +1421,256 @@ async function deleteUser(session: SessionPayload, username: string) {
   const { error } = await supabase.from("users").delete().eq("username", username);
   if (error) return { success: false, message: "Gagal menghapus user: " + error.message };
   return { success: true, message: "User berhasil dihapus." };
+}
+
+// ---------------------------------------------------------------------------
+// Modul Registrasi: database klien Bapas
+//   - UPT: kelola (tambah/ubah/hapus) klien milik UPT-nya sendiri.
+//   - Kanwil/Ditjen: hanya melihat sesuai lingkup (tanpa mengubah).
+// ---------------------------------------------------------------------------
+const KLIEN_FIELDS = [
+  "no_register", "nik", "nama", "tanggal_lahir", "agama", "kewarganegaraan",
+  "pendidikan_terakhir", "pekerjaan", "status_pernikahan", "alamat", "no_hp",
+  "nama_penjamin", "no_hp_penjamin", "perkara", "pasal", "lama_pidana", "asal_instansi",
+] as const;
+const KLIEN_LIST_COLS = "id, upt_id, " + KLIEN_FIELDS.join(", ") + ", upt:upt_id(nama)";
+const MAX_KLIEN_FOTO_LENGTH = 200_000;
+
+function canManageKlien(session: SessionPayload): boolean {
+  return session.tingkat === "UPT" && !!session.upt_id;
+}
+
+async function klienInScope(session: SessionPayload, id: string) {
+  const { data } = await supabase.from("klien").select("id, upt_id").eq("id", id).maybeSingle();
+  if (!data) return null;
+  const uptIds = await scopedUptIds(session);
+  if (uptIds !== null && !uptIds.includes(data.upt_id as string)) return null;
+  return data;
+}
+
+// Validasi & normalisasi payload. Mengembalikan pesan error atau record bersih.
+function cleanKlien(payload: Record<string, unknown>, partialFoto: boolean) {
+  const rec: Record<string, unknown> = {};
+  for (const f of KLIEN_FIELDS) {
+    const v = payload?.[f];
+    const t = v === null || v === undefined ? "" : String(v).trim();
+    if (t.length > 500) return { error: `Isian "${f}" terlalu panjang.` };
+    rec[f] = t === "" ? null : t;
+  }
+  if (!rec.no_register) return { error: "No Register Klien wajib diisi." };
+  if (!rec.nama) return { error: "Nama lengkap wajib diisi." };
+  if (rec.nik && !/^\d{16}$/.test(rec.nik as string)) return { error: "NIK harus 16 digit angka." };
+  if (rec.tanggal_lahir && !/^\d{4}-\d{2}-\d{2}$/.test(rec.tanggal_lahir as string)) {
+    return { error: "Format tanggal lahir tidak valid." };
+  }
+  const foto = payload?.foto;
+  if (foto !== undefined) {
+    if (foto === null || foto === "") rec.foto = null;
+    else if (
+      typeof foto !== "string" || !/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(foto) ||
+      foto.length > MAX_KLIEN_FOTO_LENGTH
+    ) return { error: "Foto harus PNG/JPEG dan berukuran kecil." };
+    else rec.foto = foto;
+  } else if (!partialFoto) {
+    rec.foto = null;
+  }
+  return { rec };
+}
+
+async function listKlien(session: SessionPayload) {
+  const uptIds = await scopedUptIds(session);
+  if (uptIds !== null && uptIds.length === 0) return { success: true, data: [], can_manage: false };
+  let q = supabase.from("klien").select(KLIEN_LIST_COLS).order("nama");
+  if (uptIds !== null) q = q.in("upt_id", uptIds);
+  const { data, error } = await q;
+  if (error) return { success: false, message: error.message };
+  return { success: true, data, can_manage: canManageKlien(session) };
+}
+
+async function getKlien(session: SessionPayload, id: string) {
+  if (!(await klienInScope(session, id))) return forbidden("Data klien tidak ditemukan.");
+  const { data, error } = await supabase
+    .from("klien")
+    .select(KLIEN_LIST_COLS + ", foto, created_at, updated_at")
+    .eq("id", id)
+    .maybeSingle();
+  if (error || !data) return { success: false, message: error?.message ?? "Data klien tidak ditemukan." };
+  return { success: true, data, can_manage: canManageKlien(session) };
+}
+
+async function createKlien(session: SessionPayload, payload: Record<string, unknown>) {
+  if (!canManageKlien(session)) return forbidden("Hanya user UPT yang dapat menambah data klien.");
+  const c = cleanKlien(payload, false);
+  if (c.error) return { success: false, message: c.error };
+  const { data, error } = await supabase
+    .from("klien")
+    .insert({ ...c.rec, upt_id: session.upt_id, created_by: session.username })
+    .select("id")
+    .single();
+  if (error) {
+    if (error.code === "23505") return { success: false, message: "No Register tersebut sudah terdaftar di UPT Anda." };
+    return { success: false, message: "Gagal menyimpan: " + error.message };
+  }
+  return { success: true, id: data.id, message: "Data klien berhasil ditambahkan." };
+}
+
+async function updateKlien(session: SessionPayload, id: string, payload: Record<string, unknown>) {
+  if (!canManageKlien(session)) return forbidden("Hanya user UPT yang dapat mengubah data klien.");
+  const rec0 = await klienInScope(session, id);
+  if (!rec0 || rec0.upt_id !== session.upt_id) return forbidden("Data klien tidak ditemukan.");
+  const c = cleanKlien(payload, true);
+  if (c.error) return { success: false, message: c.error };
+  const { error } = await supabase
+    .from("klien")
+    .update({ ...c.rec, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) {
+    if (error.code === "23505") return { success: false, message: "No Register tersebut sudah terdaftar di UPT Anda." };
+    return { success: false, message: "Gagal menyimpan: " + error.message };
+  }
+  return { success: true, message: "Data klien berhasil diperbarui." };
+}
+
+async function deleteKlien(session: SessionPayload, id: string) {
+  if (!canManageKlien(session)) return forbidden("Hanya user UPT yang dapat menghapus data klien.");
+  const rec0 = await klienInScope(session, id);
+  if (!rec0 || rec0.upt_id !== session.upt_id) return forbidden("Data klien tidak ditemukan.");
+  const { error } = await supabase.from("klien").delete().eq("id", id);
+  if (error) return { success: false, message: "Gagal menghapus: " + error.message };
+  return { success: true, message: "Data klien dihapus." };
+}
+
+// ---------------------------------------------------------------------------
+// Modul Pengawasan: pelacakan lokasi klien
+//   - Presensi dikirim klien lewat halaman publik (tanpa login).
+//   - Petugas melihat lokasi sesuai lingkup; hanya user UPT yang mengatur wilayah izin.
+// ---------------------------------------------------------------------------
+const MAX_PRESENSI_FOTO_LENGTH = 400_000;
+const PRESENSI_COLS = "id, klien_id, waktu, latitude, longitude, baterai, pekerjaan, alamat_domisili, kendala";
+
+function escLike(v: string) {
+  return v.replace(/[\\%_]/g, (c) => "\\" + c);
+}
+
+async function cariKlienPublik(noRegister: unknown) {
+  const nr = typeof noRegister === "string" ? noRegister.trim() : "";
+  if (!nr || nr.length > 100) return [];
+  const { data } = await supabase
+    .from("klien")
+    .select("id, upt_id, no_register, nama, wilayah_izin, upt:upt_id(nama)")
+    .ilike("no_register", escLike(nr))
+    .limit(10);
+  return data ?? [];
+}
+
+async function publicCekKlien(noRegister: unknown) {
+  const rows = await cariKlienPublik(noRegister);
+  if (!rows.length) return { success: true, found: false };
+  return {
+    success: true,
+    found: true,
+    matches: rows.map((r: Record<string, unknown>) => ({
+      upt_id: r.upt_id,
+      upt: (r.upt as { nama?: string } | null)?.nama ?? "-",
+      nama: r.nama,
+      wilayah: r.wilayah_izin ?? "-",
+    })),
+  };
+}
+
+async function publicPresensi(body: Record<string, unknown>) {
+  const rows = await cariKlienPublik(body.no_register);
+  const cocok = body.upt_id ? rows.filter((r: Record<string, unknown>) => r.upt_id === body.upt_id) : rows;
+  if (!cocok.length) return { success: false, message: "No Register klien tidak terdaftar." };
+  if (cocok.length > 1) return { success: false, message: "No Register ada di lebih dari satu UPT, pilih UPT Anda." };
+  const klien = cocok[0] as Record<string, unknown>;
+
+  const lat = Number(body.latitude), lng = Number(body.longitude);
+  if (!isFinite(lat) || !isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    return { success: false, message: "Koordinat lokasi tidak valid." };
+  }
+  const foto = body.foto;
+  if (
+    typeof foto !== "string" || !/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(foto) ||
+    foto.length > MAX_PRESENSI_FOTO_LENGTH
+  ) return { success: false, message: "Foto presensi wajib (JPEG) dan berukuran kecil." };
+  const txt = (v: unknown) => (typeof v === "string" ? v.trim().slice(0, 500) : "") || null;
+  const bat = Number(body.baterai);
+
+  const { data: last } = await supabase
+    .from("presensi_klien").select("waktu").eq("klien_id", klien.id).order("waktu", { ascending: false }).limit(1);
+  if (last?.length && Date.now() - new Date(last[0].waktu as string).getTime() < 30_000) {
+    return { success: false, message: "Presensi baru saja terkirim, coba lagi sebentar." };
+  }
+
+  const { error } = await supabase.from("presensi_klien").insert({
+    klien_id: klien.id,
+    latitude: lat,
+    longitude: lng,
+    baterai: isFinite(bat) && bat >= 0 && bat <= 100 ? Math.round(bat) : null,
+    pekerjaan: txt(body.pekerjaan),
+    alamat_domisili: txt(body.alamat_domisili),
+    kendala: txt(body.kendala),
+    foto,
+  });
+  if (error) return { success: false, message: "Gagal menyimpan presensi." };
+  return { success: true, message: "Presensi berhasil terkirim.", nama: klien.nama };
+}
+
+async function listLokasiKlien(session: SessionPayload) {
+  const uptIds = await scopedUptIds(session);
+  if (uptIds !== null && uptIds.length === 0) return { success: true, data: [], can_manage: false };
+  let q = supabase
+    .from("klien")
+    .select("id, upt_id, no_register, nama, no_hp, wilayah_izin, lat_pusat, long_pusat, radius_km, upt:upt_id(nama)")
+    .order("nama");
+  if (uptIds !== null) q = q.in("upt_id", uptIds);
+  const { data: klien, error } = await q;
+  if (error) return { success: false, message: error.message };
+  const ids = (klien ?? []).map((k: Record<string, unknown>) => k.id as string);
+  const terbaru: Record<string, Record<string, unknown>> = {};
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data: pres } = await supabase
+      .from("presensi_klien")
+      .select(PRESENSI_COLS)
+      .in("klien_id", ids.slice(i, i + 200))
+      .order("waktu", { ascending: false })
+      .limit(5000);
+    for (const p of pres ?? []) if (!terbaru[p.klien_id as string]) terbaru[p.klien_id as string] = p;
+  }
+  const data = (klien ?? []).map((k: Record<string, unknown>) => ({ ...k, terakhir: terbaru[k.id as string] ?? null }));
+  return { success: true, data, can_manage: canManageKlien(session) };
+}
+
+async function listRiwayatPresensi(session: SessionPayload, klienId: string) {
+  if (!(await klienInScope(session, klienId))) return forbidden("Data klien tidak ditemukan.");
+  const { data, error } = await supabase
+    .from("presensi_klien").select(PRESENSI_COLS).eq("klien_id", klienId).order("waktu", { ascending: false }).limit(100);
+  if (error) return { success: false, message: error.message };
+  return { success: true, data };
+}
+
+async function getFotoPresensi(session: SessionPayload, id: string) {
+  const { data } = await supabase.from("presensi_klien").select("klien_id, foto").eq("id", id).maybeSingle();
+  if (!data || !(await klienInScope(session, data.klien_id as string))) return forbidden("Data tidak ditemukan.");
+  return { success: true, foto: data.foto };
+}
+
+async function saveWilayahKlien(session: SessionPayload, id: string, payload: Record<string, unknown>) {
+  if (!canManageKlien(session)) return forbidden("Hanya user UPT yang dapat mengatur wilayah izin klien.");
+  const rec0 = await klienInScope(session, id);
+  if (!rec0 || rec0.upt_id !== session.upt_id) return forbidden("Data klien tidak ditemukan.");
+  const num = (v: unknown) => (v === null || v === undefined || String(v).trim() === "" ? null : Number(v));
+  const lat = num(payload?.lat_pusat), lng = num(payload?.long_pusat), rad = num(payload?.radius_km);
+  if ([lat, lng, rad].some((n) => n !== null && !isFinite(n))) return { success: false, message: "Angka tidak valid." };
+  if ((lat === null) !== (lng === null)) return { success: false, message: "Latitude dan longitude harus diisi bersamaan." };
+  if (lat !== null && (Math.abs(lat) > 90 || Math.abs(lng as number) > 180)) return { success: false, message: "Koordinat tidak valid." };
+  if (rad !== null && (rad <= 0 || rad > 5000)) return { success: false, message: "Radius harus antara 0 dan 5000 km." };
+  const w = typeof payload?.wilayah_izin === "string" ? payload.wilayah_izin.trim().slice(0, 200) : "";
+  const { error } = await supabase
+    .from("klien")
+    .update({ wilayah_izin: w || null, lat_pusat: lat, long_pusat: lng, radius_km: rad, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) return { success: false, message: "Gagal menyimpan: " + error.message };
+  return { success: true, message: "Wilayah izin disimpan." };
 }

@@ -10,6 +10,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
@@ -85,6 +87,51 @@
 <body class="bg-light">
 
 <!-- PRATINJAU PDF -->
+<div class="modal fade" id="klienModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="klienModalTitle">Tambah Klien</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="kfId">
+        <div class="text-center mb-3">
+          <img id="kfFotoPrev" class="avatar" width="96" height="128" style="border-radius:8px;" src="" alt="Foto">
+          <div class="mt-2">
+            <input type="file" id="kfFotoFile" accept="image/png,image/jpeg" class="d-none" onchange="onKlienFoto(this)">
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="document.getElementById('kfFotoFile').click()"><i class="bi bi-camera"></i> Pilih Foto</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="kfFoto=null;setKfFoto(null)">Hapus Foto</button>
+          </div>
+        </div>
+        <div class="row g-2">
+          <div class="col-md-6"><label class="form-label">No Register Klien *</label><input id="kf_no_register" class="form-control"></div>
+          <div class="col-md-6"><label class="form-label">NIK (16 digit)</label><input id="kf_nik" class="form-control" inputmode="numeric" maxlength="16"></div>
+          <div class="col-md-8"><label class="form-label">Nama Lengkap *</label><input id="kf_nama" class="form-control"></div>
+          <div class="col-md-4"><label class="form-label">Tanggal Lahir</label><input id="kf_tanggal_lahir" type="date" class="form-control"></div>
+          <div class="col-md-4"><label class="form-label">Agama</label><select id="kf_agama" class="form-select"><option value="">-</option><option>Islam</option><option>Kristen</option><option>Katolik</option><option>Hindu</option><option>Buddha</option><option>Konghucu</option><option>Lainnya</option></select></div>
+          <div class="col-md-4"><label class="form-label">Kewarganegaraan</label><input id="kf_kewarganegaraan" class="form-control" value="WNI"></div>
+          <div class="col-md-4"><label class="form-label">Status Pernikahan</label><select id="kf_status_pernikahan" class="form-select"><option value="">-</option><option>Belum Kawin</option><option>Kawin</option><option>Cerai Hidup</option><option>Cerai Mati</option></select></div>
+          <div class="col-md-6"><label class="form-label">Pendidikan Terakhir</label><select id="kf_pendidikan_terakhir" class="form-select"><option value="">-</option><option>Tidak Sekolah</option><option>SD</option><option>SMP</option><option>SMA/SMK</option><option>D3</option><option>S1</option><option>S2</option><option>S3</option></select></div>
+          <div class="col-md-6"><label class="form-label">Pekerjaan</label><input id="kf_pekerjaan" class="form-control"></div>
+          <div class="col-md-8"><label class="form-label">Alamat</label><textarea id="kf_alamat" class="form-control" rows="2"></textarea></div>
+          <div class="col-md-4"><label class="form-label">No HP</label><input id="kf_no_hp" class="form-control" inputmode="tel"></div>
+          <div class="col-md-6"><label class="form-label">Nama Penjamin</label><input id="kf_nama_penjamin" class="form-control"></div>
+          <div class="col-md-6"><label class="form-label">No HP Penjamin</label><input id="kf_no_hp_penjamin" class="form-control" inputmode="tel"></div>
+          <div class="col-md-6"><label class="form-label">Perkara Tindak Pidana</label><input id="kf_perkara" class="form-control"></div>
+          <div class="col-md-6"><label class="form-label">Pasal Pelanggaran</label><input id="kf_pasal" class="form-control"></div>
+          <div class="col-md-6"><label class="form-label">Lama Pidana</label><input id="kf_lama_pidana" class="form-control" placeholder="mis. 2 tahun 6 bulan"></div>
+          <div class="col-md-6"><label class="form-label">Asal Instansi</label><input id="kf_asal_instansi" class="form-control" placeholder="mis. Lapas Kelas IIA ..."></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+        <button type="button" class="btn btn-primary" id="btnKlienSimpan" onclick="simpanKlien()">Simpan</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="pdfPreviewModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content">
@@ -117,7 +164,10 @@
       <input type="password" id="password" class="form-control form-control-lg mb-4" placeholder="Masukkan Password" required>
       <button type="submit" class="btn btn-primary btn-lg w-100">Login</button>
     </form>
-    <div class="text-center mt-4"><img src="logo-kemenimipas.png" alt="Logo Kemenimipas" style="height: 56px;"></div>
+    <div class="d-flex justify-content-center align-items-center gap-3 mt-4">
+      <img src="logo-kemenimipas.png" alt="Logo Kemenimipas" style="height: 56px;">
+      <img src="logo-pemasyarakatan.png" alt="Logo Pemasyarakatan" style="height: 56px;">
+    </div>
   </div>
   <div class="star-footer">&copy; 2026 STAR-PK. Kementerian Imigrasi dan Pemasyarakatan</div>
 </div>
@@ -152,6 +202,15 @@
   <ul class="nav nav-tabs d-none" id="mainTabs">
     <li class="nav-item" id="tabBerandaContainer">
       <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabBeranda" type="button">Laman</button>
+    </li>
+    <li class="nav-item" id="tabKlienContainer">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabKlien" type="button" onclick="loadKlienList()">Data Klien</button>
+    </li>
+    <li class="nav-item" id="tabProfilKlienContainer">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabProfilKlien" type="button" onclick="loadProfilKlienTab()">Profil Klien</button>
+    </li>
+    <li class="nav-item" id="tabPelacakanContainer">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabPelacakan" type="button" onclick="loadPelacakan()">Pelacakan Klien</button>
     </li>
     <li class="nav-item">
       <button class="nav-link fw-bold text-primary" data-bs-toggle="tab" data-bs-target="#tabDashboard" type="button" onclick="loadDataList()">📋 Data Asesmen</button>
@@ -468,6 +527,50 @@
       </div>
     </div>
 
+    <!-- REGISTRASI: DATA KLIEN -->
+    <div class="tab-pane fade" id="tabKlien">
+      <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+        <h5 class="m-0">Data Klien <small class="text-muted" id="klCount"></small></h5>
+        <button class="btn btn-sm btn-primary d-none" id="btnTambahKlien" onclick="openKlienModal()">➕ Tambah Klien</button>
+      </div>
+      <input type="search" id="klSearch" class="form-control form-control-sm mb-2" placeholder="Cari no register / NIK / nama / perkara / asal instansi..." oninput="renderKlienTable()">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle">
+          <thead class="table-light"><tr>
+            <th>No</th><th>No Register</th><th>NIK</th><th>Nama Lengkap</th><th>Tgl Lahir</th><th>Perkara</th><th>Lama Pidana</th><th>Asal Instansi</th><th class="th-upt-klien d-none">UPT</th><th style="min-width:130px;">Aksi</th>
+          </tr></thead>
+          <tbody id="klBody"><tr><td colspan="10" class="text-center text-muted">Memuat...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- REGISTRASI: PROFIL KLIEN -->
+    <div class="tab-pane fade" id="tabProfilKlien">
+      <h5 class="mb-3">Profil Klien</h5>
+      <select id="pkSelect" class="form-select mb-3" onchange="tampilProfilKlien(this.value)"></select>
+      <div id="pkDetail" class="text-muted">Pilih klien untuk melihat profil.</div>
+    </div>
+
+    <!-- PENGAWASAN: PELACAKAN KLIEN -->
+    <div class="tab-pane fade" id="tabPelacakan">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <h5 class="m-0">Pelacakan Klien <small class="text-muted fs-6" id="plCount"></small></h5>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-outline-primary" onclick="salinLinkPresensi()"><i class="bi bi-link-45deg"></i> Salin tautan presensi klien</button>
+          <button class="btn btn-sm btn-outline-secondary" onclick="loadPelacakan()"><i class="bi bi-arrow-clockwise"></i> Muat ulang</button>
+        </div>
+      </div>
+      <div class="row g-3">
+        <div class="col-lg-8"><div id="plMap" style="height:440px;border-radius:8px;border:1px solid #dee2e6;"></div>
+          <div class="small text-muted mt-1"><span class="text-success">●</span> Dalam wilayah izin &nbsp; <span class="text-danger">●</span> Di luar wilayah &nbsp; <span class="text-primary">●</span> Tanpa batas wilayah &nbsp; <span class="text-secondary">●</span> Belum presensi (tidak tampil di peta)</div></div>
+        <div class="col-lg-4">
+          <input type="search" id="plSearch" class="form-control form-control-sm mb-2" placeholder="Cari nama / no register..." oninput="renderPelacakanList()">
+          <div id="plList" class="list-group" style="max-height:440px;overflow:auto;"></div>
+        </div>
+      </div>
+      <div id="plDetail" class="mt-3"></div>
+    </div>
+
     <!-- KELOLA USER -->
     <div class="tab-pane fade" id="tabUser">
       <div class="d-flex justify-content-between align-items-center mb-3">
@@ -620,15 +723,20 @@
   // Enam modul utama STAR-PK. Ubah aktif:true saat modul siap; sementara disembunyikan.
   // Fitur Asesmen Rehabilitasi dan Reedukasi nantinya berada di bawah modul Litmas.
   const MODUL_UTAMA = [
-    { nama: 'Registrasi Warga Binaan', icon: 'bi-person-vcard', aktif: false },
     { nama: 'Penelitian Kemasyarakatan (Litmas)', icon: 'bi-journal-text', aktif: false },
     { nama: 'Pendampingan', icon: 'bi-people', aktif: false },
     { nama: 'Pembimbingan', icon: 'bi-person-check', aktif: false },
-    { nama: 'Pengawasan', icon: 'bi-eye', aktif: false },
     { nama: 'Sidang TPP', icon: 'bi-hammer', aktif: false }
   ];
   const SIDE_MENU = [
     { label: 'Laman', icon: 'bi-speedometer2', box: 'tabBerandaContainer' },
+    { label: 'Registrasi', icon: 'bi-person-vcard', children: [
+      { label: 'Data Klien', icon: 'bi-people', box: 'tabKlienContainer' },
+      { label: 'Profil Klien', icon: 'bi-person-lines-fill', box: 'tabProfilKlienContainer' }
+    ]},
+    { label: 'Pengawasan', icon: 'bi-eye', children: [
+      { label: 'Pelacakan Klien', icon: 'bi-geo-alt', box: 'tabPelacakanContainer' }
+    ]},
     { label: 'Asesmen Rehabilitasi & Reedukasi', icon: 'bi-clipboard2-pulse', children: [
       { label: 'Data Asesmen', icon: 'bi-table', box: 'tabDashboard', tab: true },
       { label: 'Asesmen Baru', icon: 'bi-plus-circle', box: 'tabFormContainer' },
@@ -678,7 +786,7 @@
     document.getElementById('welGreet').innerText = 'Selamat ' + (hr < 11 ? 'pagi' : hr < 15 ? 'siang' : hr < 18 ? 'sore' : 'malam');
     document.getElementById('welNama').innerText = asr;
     document.getElementById('welInfo').innerText = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) + (userJabatan ? ' · ' + userJabatan : '') + ' · ' + ({ UPT: 'UPT', KANWIL: 'Kanwil', DITJEN: 'Ditjenpas' }[userTingkat] || '');
-    document.getElementById('berandaCards').innerHTML = `<div class="col-md-6 col-xl-4"><div class="mod-card" onclick="sideBtn(SIDE_MENU[1].children[0]).click()"><div class="ic"><i class="bi bi-clipboard2-pulse"></i></div><div><div class="fw-bold" style="color:#0E203C;">Asesmen Rehabilitasi dan Reedukasi</div><small class="text-muted">Input, kelola, dan cetak hasil asesmen warga binaan</small></div></div></div>`;
+    document.getElementById('berandaCards').innerHTML = `<div class="col-md-6 col-xl-4"><div class="mod-card" onclick="sideBtn(SIDE_MENU[1].children[0]).click()"><div class="ic"><i class="bi bi-person-vcard"></i></div><div><div class="fw-bold" style="color:#0E203C;">Registrasi</div><small class="text-muted">Database dan profil klien Balai Pemasyarakatan</small></div></div></div><div class="col-md-6 col-xl-4"><div class="mod-card" onclick="sideBtn(SIDE_MENU[2].children[0]).click()"><div class="ic"><i class="bi bi-eye"></i></div><div><div class="fw-bold" style="color:#0E203C;">Pengawasan</div><small class="text-muted">Pelacakan lokasi dan presensi klien</small></div></div></div><div class="col-md-6 col-xl-4"><div class="mod-card" onclick="sideBtn(SIDE_MENU[3].children[0]).click()"><div class="ic"><i class="bi bi-clipboard2-pulse"></i></div><div><div class="fw-bold" style="color:#0E203C;">Asesmen Rehabilitasi dan Reedukasi</div><small class="text-muted">Input, kelola, dan cetak hasil asesmen warga binaan</small></div></div></div>`;
     syncSidebar();
     loadFoto();
   }
@@ -1446,6 +1554,282 @@
     callApi('saveMyPhoto', { image: null }).then(r => {
       alert(r.message);
       if (r.success) { fotoDraft = null; setFoto(null); document.getElementById('btnFotoSimpan').classList.add('d-none'); }
+    });
+  }
+
+
+  // ===== MODUL REGISTRASI: KLIEN =====
+  const KL_FIELDS = ['no_register','nik','nama','tanggal_lahir','agama','kewarganegaraan','pendidikan_terakhir','pekerjaan','status_pernikahan','alamat','no_hp','nama_penjamin','no_hp_penjamin','perkara','pasal','lama_pidana','asal_instansi'];
+  const KL_LABEL = { no_register:'No Register Klien', nik:'NIK', nama:'Nama Lengkap', tanggal_lahir:'Tanggal Lahir', agama:'Agama', kewarganegaraan:'Kewarganegaraan', pendidikan_terakhir:'Pendidikan Terakhir', pekerjaan:'Pekerjaan', status_pernikahan:'Status Pernikahan', alamat:'Alamat', no_hp:'No HP', nama_penjamin:'Nama Penjamin', no_hp_penjamin:'No HP Penjamin', perkara:'Perkara Tindak Pidana', pasal:'Pasal Pelanggaran', lama_pidana:'Lama Pidana', asal_instansi:'Asal Instansi' };
+  let allKlien = [], klCanManage = false, kfFoto = undefined, klCurrentId = null;
+  const KL_FOTO_DEFAULT = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 120"><rect width="90" height="120" fill="#ced4da"/><circle cx="45" cy="45" r="20" fill="#fff"/><path d="M10 120c0-26 15-40 35-40s35 14 35 40z" fill="#fff"/></svg>');
+  const fmtTgl = t => t ? new Date(t + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-';
+
+  function loadKlienList() {
+    return callApi('listKlien').then(r => {
+      if (!r.success) { document.getElementById('klBody').innerHTML = `<tr><td colspan="10" class="text-danger text-center">${escHtml(r.message)}</td></tr>`; return; }
+      allKlien = r.data || []; klCanManage = !!r.can_manage;
+      document.getElementById('btnTambahKlien').classList.toggle('d-none', !klCanManage);
+      document.querySelectorAll('.th-upt-klien').forEach(e => e.classList.toggle('d-none', userTingkat === 'UPT'));
+      renderKlienTable();
+    });
+  }
+
+  function renderKlienTable() {
+    const q = document.getElementById('klSearch').value.trim().toLowerCase();
+    const rows = allKlien.filter(k => !q || ['no_register','nik','nama','perkara','asal_instansi'].some(f => (k[f] || '').toLowerCase().includes(q)));
+    document.getElementById('klCount').innerText = `(${rows.length} dari ${allKlien.length})`;
+    const showUpt = userTingkat !== 'UPT';
+    document.getElementById('klBody').innerHTML = rows.length ? rows.map((k, i) => `<tr>
+      <td>${i + 1}</td><td>${escHtml(k.no_register)}</td><td>${escHtml(k.nik || '-')}</td><td class="fw-semibold">${escHtml(k.nama)}</td>
+      <td>${fmtTgl(k.tanggal_lahir)}</td><td>${escHtml(k.perkara || '-')}</td><td>${escHtml(k.lama_pidana || '-')}</td><td>${escHtml(k.asal_instansi || '-')}</td>
+      ${showUpt ? `<td>${escHtml(k.upt ? k.upt.nama : '-')}</td>` : ''}
+      <td class="text-nowrap">
+        <button class="btn btn-sm btn-outline-primary" title="Profil" onclick="bukaProfilKlien('${k.id}')"><i class="bi bi-person-lines-fill"></i></button>
+        ${klCanManage ? `<button class="btn btn-sm btn-outline-secondary" title="Ubah" onclick="openKlienModal('${k.id}')"><i class="bi bi-pencil"></i></button>
+        <button class="btn btn-sm btn-outline-danger" title="Hapus" onclick="hapusKlien('${k.id}')"><i class="bi bi-trash"></i></button>` : ''}
+      </td></tr>`).join('') : `<tr><td colspan="${showUpt ? 10 : 9}" class="text-center text-muted">Belum ada data klien.</td></tr>`;
+  }
+
+  function setKfFoto(src) { document.getElementById('kfFotoPrev').src = src || KL_FOTO_DEFAULT; }
+
+  function onKlienFoto(input) {
+    const f = input.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const im = new Image();
+      im.onload = () => {
+        // Potong tengah rasio 3:4 (pas foto) lalu perkecil ke 300x400.
+        const W = 300, H = 400, ratio = W / H;
+        let sw = im.width, sh = im.height;
+        if (sw / sh > ratio) sw = sh * ratio; else sh = sw / ratio;
+        const c = document.createElement('canvas'); c.width = W; c.height = H;
+        c.getContext('2d').drawImage(im, (im.width - sw) / 2, (im.height - sh) / 2, sw, sh, 0, 0, W, H);
+        kfFoto = c.toDataURL('image/jpeg', 0.85);
+        setKfFoto(kfFoto);
+      };
+      im.onerror = () => alert('File bukan gambar yang valid.');
+      im.src = reader.result;
+    };
+    reader.readAsDataURL(f);
+  }
+
+  function openKlienModal(id) {
+    document.getElementById('kfId').value = id || '';
+    document.getElementById('klienModalTitle').innerText = id ? 'Ubah Data Klien' : 'Tambah Klien';
+    document.getElementById('kfFotoFile').value = '';
+    kfFoto = undefined; // undefined = foto tidak diubah
+    KL_FIELDS.forEach(f => document.getElementById('kf_' + f).value = f === 'kewarganegaraan' ? 'WNI' : '');
+    setKfFoto(null);
+    new bootstrap.Modal(document.getElementById('klienModal')).show();
+    if (id) {
+      callApi('getKlien', { id }).then(r => {
+        if (!r.success) return alert(r.message);
+        KL_FIELDS.forEach(f => document.getElementById('kf_' + f).value = r.data[f] || '');
+        setKfFoto(r.data.foto);
+      });
+    }
+  }
+
+  function simpanKlien() {
+    const id = document.getElementById('kfId').value;
+    const payload = {};
+    KL_FIELDS.forEach(f => payload[f] = document.getElementById('kf_' + f).value);
+    if (kfFoto !== undefined) payload.foto = kfFoto;
+    if (!payload.no_register.trim()) return alert('No Register Klien wajib diisi.');
+    if (!payload.nama.trim()) return alert('Nama lengkap wajib diisi.');
+    if (payload.nik.trim() && !/^\d{16}$/.test(payload.nik.trim())) return alert('NIK harus 16 digit angka.');
+    const btn = document.getElementById('btnKlienSimpan'); btn.disabled = true;
+    callApi(id ? 'updateKlien' : 'createKlien', id ? { id, payload } : { payload }).then(r => {
+      btn.disabled = false;
+      alert(r.message);
+      if (r.success) {
+        bootstrap.Modal.getInstance(document.getElementById('klienModal')).hide();
+        loadKlienList().then(() => { if (klCurrentId && document.getElementById('tabProfilKlien').classList.contains('active')) tampilProfilKlien(klCurrentId); });
+      }
+    }).catch(e => { btn.disabled = false; alert('Error: ' + e); });
+  }
+
+  function hapusKlien(id) {
+    const k = allKlien.find(x => x.id === id);
+    if (!confirm(`Hapus data klien ${k ? k.nama : ''}?`)) return;
+    callApi('deleteKlien', { id }).then(r => {
+      alert(r.message);
+      if (r.success) { if (klCurrentId === id) klCurrentId = null; loadKlienList(); }
+    });
+  }
+
+  function bukaProfilKlien(id) {
+    klCurrentId = id;
+    sideBtn(SIDE_MENU[1].children[1]).click();
+  }
+
+  function loadProfilKlienTab() {
+    return loadKlienList().then(() => {
+      const sel = document.getElementById('pkSelect');
+      sel.innerHTML = '<option value="">-- Pilih klien --</option>' + allKlien.map(k => `<option value="${k.id}">${escHtml(k.no_register)} - ${escHtml(k.nama)}</option>`).join('');
+      if (klCurrentId && allKlien.some(k => k.id === klCurrentId)) { sel.value = klCurrentId; tampilProfilKlien(klCurrentId); }
+      else { klCurrentId = null; document.getElementById('pkDetail').innerHTML = '<span class="text-muted">Pilih klien untuk melihat profil.</span>'; }
+    });
+  }
+
+  function tampilProfilKlien(id) {
+    const box = document.getElementById('pkDetail');
+    if (!id) { klCurrentId = null; box.innerHTML = '<span class="text-muted">Pilih klien untuk melihat profil.</span>'; return; }
+    klCurrentId = id;
+    box.innerHTML = '<span class="text-muted">Memuat...</span>';
+    callApi('getKlien', { id }).then(r => {
+      if (!r.success) { box.innerHTML = `<span class="text-danger">${escHtml(r.message)}</span>`; return; }
+      const k = r.data;
+      const row = (l, v) => `<tr><th style="width:190px;" class="text-muted fw-semibold">${l}</th><td>${escHtml(v || '-')}</td></tr>`;
+      const sec = (t, rows) => `<h6 class="fw-bold mt-3 mb-2">${t}</h6><table class="table table-sm table-borderless mb-0"><tbody>${rows}</tbody></table>`;
+      box.innerHTML = `<div class="card"><div class="card-body"><div class="row g-4">
+        <div class="col-md-3 text-center">
+          <img class="avatar" style="width:150px;height:200px;border-radius:8px;" src="${k.foto || KL_FOTO_DEFAULT}" alt="Foto">
+          <h5 class="mt-3 mb-0">${escHtml(k.nama)}</h5>
+          <div class="text-muted">${escHtml(k.no_register)}</div>
+          ${klCanManage ? `<div class="mt-3"><button class="btn btn-sm btn-outline-secondary" onclick="openKlienModal('${k.id}')"><i class="bi bi-pencil"></i> Ubah</button></div>` : ''}
+        </div>
+        <div class="col-md-9">
+          ${sec('Data Pribadi', row('NIK', k.nik) + row('Tanggal Lahir', k.tanggal_lahir ? fmtTgl(k.tanggal_lahir) : '') + row('Agama', k.agama) + row('Kewarganegaraan', k.kewarganegaraan) + row('Pendidikan Terakhir', k.pendidikan_terakhir) + row('Pekerjaan', k.pekerjaan) + row('Status Pernikahan', k.status_pernikahan))}
+          ${sec('Kontak', row('Alamat', k.alamat) + row('No HP', k.no_hp) + row('Nama Penjamin', k.nama_penjamin) + row('No HP Penjamin', k.no_hp_penjamin))}
+          ${sec('Perkara', row('Perkara Tindak Pidana', k.perkara) + row('Pasal Pelanggaran', k.pasal) + row('Lama Pidana', k.lama_pidana) + row('Asal Instansi', k.asal_instansi) + row('UPT', k.upt ? k.upt.nama : ''))}
+        </div></div></div></div>`;
+    });
+  }
+
+  // ---------------- PENGAWASAN: PELACAKAN KLIEN ----------------
+  let plMap = null, plLayer = null, plData = [], plSel = null, plCanManage = false;
+
+  function hitungJarakKm(a, b, c, d) {
+    const R = 6371, rad = x => x * Math.PI / 180, dLa = rad(c - a), dLo = rad(d - b);
+    const h = Math.sin(dLa / 2) ** 2 + Math.cos(rad(a)) * Math.cos(rad(c)) * Math.sin(dLo / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  }
+  // Status: 'dalam' | 'luar' | 'bebas' (tanpa batas wilayah) | 'belum' (belum presensi)
+  function plStatus(k, t) {
+    if (!t) return 'belum';
+    if (k.lat_pusat == null || k.long_pusat == null || !k.radius_km) return 'bebas';
+    return hitungJarakKm(k.lat_pusat, k.long_pusat, t.latitude, t.longitude) <= k.radius_km ? 'dalam' : 'luar';
+  }
+  const PL_WARNA = { dalam: '#198754', luar: '#dc3545', bebas: '#0d6efd', belum: '#6c757d' };
+  const PL_LABEL = { dalam: 'Dalam wilayah izin', luar: 'DI LUAR wilayah izin', bebas: 'Tanpa batas wilayah', belum: 'Belum presensi' };
+  const fmtWaktuPl = t => t ? new Date(t).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+
+  function salinLinkPresensi() {
+    const url = new URL('presensi.html', location.href).href;
+    (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(() => alert('Tautan disalin:\n' + url), () => prompt('Salin tautan presensi klien:', url));
+  }
+
+  function loadPelacakan() {
+    if (!plMap) {
+      plMap = L.map('plMap').setView([-2.5, 118], 5);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(plMap);
+      plLayer = L.layerGroup().addTo(plMap);
+    }
+    setTimeout(() => plMap.invalidateSize(), 250);
+    return callApi('listLokasiKlien').then(r => {
+      if (!r.success) { document.getElementById('plList').innerHTML = `<div class="text-danger p-2">${escHtml(r.message)}</div>`; return; }
+      plData = r.data || []; plCanManage = !!r.can_manage;
+      renderPelacakan(true);
+      if (plSel && plData.some(k => k.id === plSel)) bukaDetailPelacakan(plSel, false);
+    });
+  }
+
+  function renderPelacakan(fit) {
+    plLayer.clearLayers();
+    const pts = [];
+    plData.forEach(k => {
+      const t = k.terakhir, st = plStatus(k, t);
+      if (k.lat_pusat != null && k.long_pusat != null && k.radius_km) {
+        L.circle([k.lat_pusat, k.long_pusat], { radius: k.radius_km * 1000, color: PL_WARNA[st === 'belum' ? 'bebas' : st], weight: 1, fillOpacity: 0.05, interactive: false }).addTo(plLayer);
+      }
+      if (!t) return;
+      pts.push([t.latitude, t.longitude]);
+      L.circleMarker([t.latitude, t.longitude], { radius: 9, color: '#fff', weight: 2, fillColor: PL_WARNA[st], fillOpacity: 1 })
+        .bindTooltip(`${escHtml(k.nama)} (${escHtml(k.no_register)})`).on('click', () => bukaDetailPelacakan(k.id, true)).addTo(plLayer);
+    });
+    if (fit && pts.length) plMap.fitBounds(pts, { padding: [40, 40], maxZoom: 15 });
+    renderPelacakanList();
+  }
+
+  function renderPelacakanList() {
+    const q = document.getElementById('plSearch').value.trim().toLowerCase();
+    const rows = plData.filter(k => !q || (k.nama + ' ' + k.no_register).toLowerCase().includes(q));
+    const urut = { luar: 0, dalam: 1, bebas: 2, belum: 3 };
+    rows.sort((a, b) => urut[plStatus(a, a.terakhir)] - urut[plStatus(b, b.terakhir)] || a.nama.localeCompare(b.nama));
+    document.getElementById('plCount').innerText = `(${plData.filter(k => k.terakhir).length} dari ${plData.length} klien sudah presensi)`;
+    document.getElementById('plList').innerHTML = rows.length ? rows.map(k => {
+      const st = plStatus(k, k.terakhir);
+      return `<button type="button" class="list-group-item list-group-item-action ${k.id === plSel ? 'active' : ''}" onclick="bukaDetailPelacakan('${k.id}', true)">
+        <div class="d-flex justify-content-between"><span class="fw-semibold">${escHtml(k.nama)}</span><span style="color:${k.id === plSel ? '#fff' : PL_WARNA[st]}">●</span></div>
+        <small>${escHtml(k.no_register)} · ${k.terakhir ? fmtWaktuPl(k.terakhir.waktu) : 'belum presensi'}</small></button>`;
+    }).join('') : '<div class="text-muted p-2">Belum ada klien.</div>';
+  }
+
+  function bukaDetailPelacakan(id, fokus) {
+    plSel = id;
+    const k = plData.find(x => x.id === id);
+    if (!k) return;
+    renderPelacakanList();
+    const t = k.terakhir, st = plStatus(k, t);
+    if (fokus && t) plMap.setView([t.latitude, t.longitude], Math.max(plMap.getZoom(), 15));
+    const box = document.getElementById('plDetail');
+    const jarak = t && st !== 'bebas' && st !== 'belum' ? hitungJarakKm(k.lat_pusat, k.long_pusat, t.latitude, t.longitude).toFixed(2) + ' km dari titik pusat' : '';
+    box.innerHTML = `<div class="card"><div class="card-body">
+      <div class="d-flex flex-wrap justify-content-between gap-2">
+        <div><h5 class="mb-0">${escHtml(k.nama)}</h5><div class="text-muted">${escHtml(k.no_register)} · HP ${escHtml(k.no_hp || '-')}${userTingkat !== 'UPT' ? ' · ' + escHtml(k.upt ? k.upt.nama : '') : ''}</div></div>
+        <div><span class="badge" style="background:${PL_WARNA[st]}">${PL_LABEL[st]}</span></div>
+      </div>
+      <div class="row g-3 mt-1">
+        <div class="col-md-4 text-center" id="plFotoBox">${t ? '<span class="text-muted">Memuat foto...</span>' : '<span class="text-muted">Belum ada foto presensi.</span>'}</div>
+        <div class="col-md-8">
+          ${t ? `<table class="table table-sm table-borderless mb-2"><tbody>
+            <tr><th class="text-muted" style="width:150px">Presensi terakhir</th><td>${fmtWaktuPl(t.waktu)}</td></tr>
+            <tr><th class="text-muted">Koordinat</th><td>${t.latitude.toFixed(6)}, ${t.longitude.toFixed(6)} <a target="_blank" rel="noopener" href="https://www.google.com/maps?q=${t.latitude},${t.longitude}">Buka di Google Maps</a>${jarak ? '<br><small class="text-muted">' + jarak + '</small>' : ''}</td></tr>
+            <tr><th class="text-muted">Baterai</th><td>${t.baterai == null ? '-' : t.baterai + '%'}</td></tr>
+            <tr><th class="text-muted">Pekerjaan</th><td>${escHtml(t.pekerjaan || '-')}</td></tr>
+            <tr><th class="text-muted">Alamat domisili</th><td>${escHtml(t.alamat_domisili || '-')}</td></tr>
+            <tr><th class="text-muted">Kendala</th><td>${escHtml(t.kendala || '-')}</td></tr></tbody></table>` : ''}
+          <div class="small"><b>Wilayah izin:</b> ${escHtml(k.wilayah_izin || '-')}${k.radius_km ? ` (pusat ${k.lat_pusat}, ${k.long_pusat}; radius ${k.radius_km} km)` : ' (belum ada batas radius)'}
+            ${plCanManage ? ` <button class="btn btn-sm btn-outline-secondary py-0" onclick="aturWilayahKlien('${k.id}')"><i class="bi bi-pencil"></i> Atur</button>` : ''}</div>
+        </div>
+      </div>
+      <h6 class="fw-bold mt-3">Riwayat presensi</h6>
+      <div id="plRiwayat" class="table-responsive text-muted">Memuat...</div>
+    </div></div>`;
+    if (t) callApi('getFotoPresensi', { id: t.id }).then(r => {
+      const fb = document.getElementById('plFotoBox');
+      if (plSel === id && fb) fb.innerHTML = r.success && r.foto ? `<img src="${r.foto}" class="img-fluid rounded" alt="Foto presensi">` : '<span class="text-muted">Foto tidak tersedia.</span>';
+    });
+    callApi('listRiwayatPresensi', { klien_id: id }).then(r => {
+      const rb = document.getElementById('plRiwayat');
+      if (plSel !== id || !rb) return;
+      if (!r.success) { rb.innerHTML = `<span class="text-danger">${escHtml(r.message)}</span>`; return; }
+      rb.innerHTML = r.data.length ? `<table class="table table-sm table-striped mb-0"><thead><tr><th>Waktu</th><th>Koordinat</th><th>Pekerjaan</th><th>Kendala</th><th>Status</th></tr></thead><tbody>${r.data.map(p => {
+        const s2 = plStatus(k, p);
+        return `<tr><td class="text-nowrap">${fmtWaktuPl(p.waktu)}</td><td><a target="_blank" rel="noopener" href="https://www.google.com/maps?q=${p.latitude},${p.longitude}">${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}</a></td><td>${escHtml(p.pekerjaan || '-')}</td><td>${escHtml(p.kendala || '-')}</td><td><span style="color:${PL_WARNA[s2]}">●</span> ${PL_LABEL[s2]}</td></tr>`;
+      }).join('')}</tbody></table>` : 'Belum ada riwayat.';
+    });
+    box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function aturWilayahKlien(id) {
+    const k = plData.find(x => x.id === id);
+    const w = prompt('Nama wilayah izin (mis. Kabupaten Banyumas):', k.wilayah_izin || '');
+    if (w === null) return;
+    const c = prompt('Titik pusat "latitude, longitude" (mis. -7.4243, 109.2391). Kosongkan jika tanpa batas radius:', k.lat_pusat != null ? k.lat_pusat + ', ' + k.long_pusat : '');
+    if (c === null) return;
+    let lat = '', lng = '', rad = '';
+    if (c.trim()) {
+      [lat, lng] = c.split(',').map(x => x.trim());
+      rad = prompt('Radius wilayah izin (km):', k.radius_km || '');
+      if (rad === null) return;
+    }
+    callApi('saveWilayahKlien', { id, payload: { wilayah_izin: w, lat_pusat: lat, long_pusat: lng, radius_km: rad } }).then(r => {
+      alert(r.message);
+      if (r.success) loadPelacakan();
     });
   }
 
