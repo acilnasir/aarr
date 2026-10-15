@@ -1999,7 +1999,8 @@
     renderLitmasDinamis();
     lmSet('header', 'kementerian', 'KEMENTERIAN IMIGRASI DAN PEMASYARAKATAN R.I.');
     if (litmasKonteks) {
-      lmSet('header', 'kanwil', 'KANTOR WILAYAH DIREKTORAT JENDERAL PEMASYARAKATAN ' + (litmasKonteks.kanwil_nama || '').toUpperCase().replace(/^KANWIL\s+/, ''));
+      const kw = (litmasKonteks.kanwil_nama || '').toUpperCase();
+      lmSet('header', 'kanwil', /^KANTOR WILAYAH/.test(kw) ? kw : 'KANTOR WILAYAH DIREKTORAT JENDERAL PEMASYARAKATAN ' + kw.replace(/^KANWIL\s+/, ''));
       lmSet('header', 'bapas', (litmasKonteks.upt_nama || '').toUpperCase());
     }
     lmSet('pejabat', 'pk_nama', asr);
