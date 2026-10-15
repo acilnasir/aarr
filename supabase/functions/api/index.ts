@@ -251,6 +251,23 @@ serve(async (req: Request) => {
         result = await deleteUser(session, body.username);
         break;
 
+      // --- Modul Registrasi: klien Bapas ---
+      case "listKlien":
+        result = await listKlien(session);
+        break;
+      case "getKlien":
+        result = await getKlien(session, body.id);
+        break;
+      case "createKlien":
+        result = await createKlien(session, body.payload);
+        break;
+      case "updateKlien":
+        result = await updateKlien(session, body.id, body.payload);
+        break;
+      case "deleteKlien":
+        result = await deleteKlien(session, body.id);
+        break;
+
       default:
         result = { success: false, message: "Aksi tidak dikenal." };
     }
@@ -1386,4 +1403,121 @@ async function deleteUser(session: SessionPayload, username: string) {
   const { error } = await supabase.from("users").delete().eq("username", username);
   if (error) return { success: false, message: "Gagal menghapus user: " + error.message };
   return { success: true, message: "User berhasil dihapus." };
+}
+
+// ---------------------------------------------------------------------------
+// Modul Registrasi: database klien Bapas
+//   - UPT: kelola (tambah/ubah/hapus) klien milik UPT-nya sendiri.
+//   - Kanwil/Ditjen: hanya melihat sesuai lingkup (tanpa mengubah).
+// ---------------------------------------------------------------------------
+const KLIEN_FIELDS = [
+  "no_register", "nik", "nama", "tanggal_lahir", "agama", "kewarganegaraan",
+  "pendidikan_terakhir", "pekerjaan", "status_pernikahan", "alamat", "no_hp",
+  "nama_penjamin", "no_hp_penjamin", "perkara", "pasal", "lama_pidana", "asal_instansi",
+] as const;
+const KLIEN_LIST_COLS = "id, upt_id, " + KLIEN_FIELDS.join(", ") + ", upt:upt_id(nama)";
+const MAX_KLIEN_FOTO_LENGTH = 200_000;
+
+function canManageKlien(session: SessionPayload): boolean {
+  return session.tingkat === "UPT" && !!session.upt_id;
+}
+
+async function klienInScope(session: SessionPayload, id: string) {
+  const { data } = await supabase.from("klien").select("id, upt_id").eq("id", id).maybeSingle();
+  if (!data) return null;
+  const uptIds = await scopedUptIds(session);
+  if (uptIds !== null && !uptIds.includes(data.upt_id as string)) return null;
+  return data;
+}
+
+// Validasi & normalisasi payload. Mengembalikan pesan error atau record bersih.
+function cleanKlien(payload: Record<string, unknown>, partialFoto: boolean) {
+  const rec: Record<string, unknown> = {};
+  for (const f of KLIEN_FIELDS) {
+    const v = payload?.[f];
+    const t = v === null || v === undefined ? "" : String(v).trim();
+    if (t.length > 500) return { error: `Isian "${f}" terlalu panjang.` };
+    rec[f] = t === "" ? null : t;
+  }
+  if (!rec.no_register) return { error: "No Register Klien wajib diisi." };
+  if (!rec.nama) return { error: "Nama lengkap wajib diisi." };
+  if (rec.nik && !/^\d{16}$/.test(rec.nik as string)) return { error: "NIK harus 16 digit angka." };
+  if (rec.tanggal_lahir && !/^\d{4}-\d{2}-\d{2}$/.test(rec.tanggal_lahir as string)) {
+    return { error: "Format tanggal lahir tidak valid." };
+  }
+  const foto = payload?.foto;
+  if (foto !== undefined) {
+    if (foto === null || foto === "") rec.foto = null;
+    else if (
+      typeof foto !== "string" || !/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(foto) ||
+      foto.length > MAX_KLIEN_FOTO_LENGTH
+    ) return { error: "Foto harus PNG/JPEG dan berukuran kecil." };
+    else rec.foto = foto;
+  } else if (!partialFoto) {
+    rec.foto = null;
+  }
+  return { rec };
+}
+
+async function listKlien(session: SessionPayload) {
+  const uptIds = await scopedUptIds(session);
+  if (uptIds !== null && uptIds.length === 0) return { success: true, data: [], can_manage: false };
+  let q = supabase.from("klien").select(KLIEN_LIST_COLS).order("nama");
+  if (uptIds !== null) q = q.in("upt_id", uptIds);
+  const { data, error } = await q;
+  if (error) return { success: false, message: error.message };
+  return { success: true, data, can_manage: canManageKlien(session) };
+}
+
+async function getKlien(session: SessionPayload, id: string) {
+  if (!(await klienInScope(session, id))) return forbidden("Data klien tidak ditemukan.");
+  const { data, error } = await supabase
+    .from("klien")
+    .select(KLIEN_LIST_COLS + ", foto, created_at, updated_at")
+    .eq("id", id)
+    .maybeSingle();
+  if (error || !data) return { success: false, message: error?.message ?? "Data klien tidak ditemukan." };
+  return { success: true, data, can_manage: canManageKlien(session) };
+}
+
+async function createKlien(session: SessionPayload, payload: Record<string, unknown>) {
+  if (!canManageKlien(session)) return forbidden("Hanya user UPT yang dapat menambah data klien.");
+  const c = cleanKlien(payload, false);
+  if (c.error) return { success: false, message: c.error };
+  const { data, error } = await supabase
+    .from("klien")
+    .insert({ ...c.rec, upt_id: session.upt_id, created_by: session.username })
+    .select("id")
+    .single();
+  if (error) {
+    if (error.code === "23505") return { success: false, message: "No Register tersebut sudah terdaftar di UPT Anda." };
+    return { success: false, message: "Gagal menyimpan: " + error.message };
+  }
+  return { success: true, id: data.id, message: "Data klien berhasil ditambahkan." };
+}
+
+async function updateKlien(session: SessionPayload, id: string, payload: Record<string, unknown>) {
+  if (!canManageKlien(session)) return forbidden("Hanya user UPT yang dapat mengubah data klien.");
+  const rec0 = await klienInScope(session, id);
+  if (!rec0 || rec0.upt_id !== session.upt_id) return forbidden("Data klien tidak ditemukan.");
+  const c = cleanKlien(payload, true);
+  if (c.error) return { success: false, message: c.error };
+  const { error } = await supabase
+    .from("klien")
+    .update({ ...c.rec, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) {
+    if (error.code === "23505") return { success: false, message: "No Register tersebut sudah terdaftar di UPT Anda." };
+    return { success: false, message: "Gagal menyimpan: " + error.message };
+  }
+  return { success: true, message: "Data klien berhasil diperbarui." };
+}
+
+async function deleteKlien(session: SessionPayload, id: string) {
+  if (!canManageKlien(session)) return forbidden("Hanya user UPT yang dapat menghapus data klien.");
+  const rec0 = await klienInScope(session, id);
+  if (!rec0 || rec0.upt_id !== session.upt_id) return forbidden("Data klien tidak ditemukan.");
+  const { error } = await supabase.from("klien").delete().eq("id", id);
+  if (error) return { success: false, message: "Gagal menghapus: " + error.message };
+  return { success: true, message: "Data klien dihapus." };
 }
