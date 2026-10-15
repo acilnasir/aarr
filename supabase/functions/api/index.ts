@@ -286,6 +286,20 @@ serve(async (req: Request) => {
         result = await saveWilayahKlien(session, body.id, body.payload);
         break;
 
+      // --- Modul Litmas ---
+      case "listLitmas":
+        result = await listLitmas(session);
+        break;
+      case "getLitmas":
+        result = await getLitmas(session, body.id);
+        break;
+      case "saveLitmas":
+        result = await saveLitmas(session, body.id, body.payload);
+        break;
+      case "deleteLitmas":
+        result = await deleteLitmas(session, body.id);
+        break;
+
       default:
         result = { success: false, message: "Aksi tidak dikenal." };
     }
@@ -1673,4 +1687,124 @@ async function saveWilayahKlien(session: SessionPayload, id: string, payload: Re
     .eq("id", id);
   if (error) return { success: false, message: "Gagal menyimpan: " + error.message };
   return { success: true, message: "Wilayah izin disimpan." };
+}
+
+// ---------------------------------------------------------------------------
+// Modul Litmas: laporan Penelitian Kemasyarakatan + riwayat versi.
+//   - UPT: kelola Litmas untuk klien UPT-nya. Kanwil/Ditjen: hanya melihat.
+//   - Setiap simpan menambah satu baris litmas_history (snapshot lengkap).
+// ---------------------------------------------------------------------------
+const LITMAS_TEXT = ["no_reg_litmas", "tgl_laporan", "pendahuluan", "analisis", "kesimpulan", "rekomendasi"] as const;
+const LITMAS_OBJ = ["header", "identitas", "riwayat", "komponen", "pejabat"] as const;
+const LITMAS_LIST_COLS =
+  "id, upt_id, klien_id, jenis_litmas, no_reg_litmas, tgl_laporan, versi, updated_by, updated_at, created_at, klien:klien_id(nama, no_register), upt:upt_id(nama)";
+
+function cleanLitmas(payload: Record<string, unknown>) {
+  const rec: Record<string, unknown> = {};
+  const jenis = Number(payload?.jenis_litmas);
+  if (!Number.isInteger(jenis) || jenis < 1 || jenis > 13) return { error: "Jenis Litmas tidak valid." };
+  rec.jenis_litmas = jenis;
+  for (const f of LITMAS_TEXT) {
+    const v = payload?.[f];
+    const t = v === null || v === undefined ? "" : String(v);
+    if (t.length > 20000) return { error: `Isian "${f}" terlalu panjang.` };
+    rec[f] = t.trim() === "" ? null : t;
+  }
+  for (const f of LITMAS_OBJ) {
+    const v = payload?.[f];
+    if (v === undefined || v === null) { rec[f] = {}; continue; }
+    if (typeof v !== "object" || Array.isArray(v)) return { error: `Isian "${f}" tidak valid.` };
+    const clean: Record<string, string> = {};
+    for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+      if (!/^[A-Za-z0-9_]{1,40}$/.test(k)) continue;
+      const t = val === null || val === undefined ? "" : String(val);
+      if (t.length > 20000) return { error: `Isian "${k}" terlalu panjang.` };
+      clean[k] = t;
+    }
+    rec[f] = clean;
+  }
+  return { rec };
+}
+
+async function litmasInScope(session: SessionPayload, id: string) {
+  const { data } = await supabase.from("litmas").select("*").eq("id", id).maybeSingle();
+  if (!data) return null;
+  const uptIds = await scopedUptIds(session);
+  if (uptIds !== null && !uptIds.includes(data.upt_id as string)) return null;
+  return data as Record<string, unknown>;
+}
+
+async function listLitmas(session: SessionPayload) {
+  const uptIds = await scopedUptIds(session);
+  const can_manage = canManageKlien(session);
+  let konteks: Record<string, string> | null = null;
+  if (can_manage) {
+    const { data: u } = await supabase.from("upt").select("nama, kanwil:kanwil_id(nama)").eq("id", session.upt_id).maybeSingle();
+    if (u) konteks = { upt_nama: u.nama as string, kanwil_nama: ((u.kanwil as unknown as { nama: string } | null)?.nama) ?? "" };
+  }
+  if (uptIds !== null && uptIds.length === 0) return { success: true, data: [], can_manage, konteks };
+  let q = supabase.from("litmas").select(LITMAS_LIST_COLS).order("updated_at", { ascending: false });
+  if (uptIds !== null) q = q.in("upt_id", uptIds);
+  const { data, error } = await q;
+  if (error) return { success: false, message: error.message };
+  return { success: true, data, can_manage, konteks };
+}
+
+async function getLitmas(session: SessionPayload, id: string) {
+  const rec = await litmasInScope(session, id);
+  if (!rec) return forbidden("Data Litmas tidak ditemukan.");
+  const { data: hist } = await supabase
+    .from("litmas_history")
+    .select("id, versi, aksi, oleh, waktu, snapshot")
+    .eq("litmas_id", id)
+    .order("versi", { ascending: false });
+  return { success: true, data: rec, riwayat: hist ?? [], can_manage: canManageKlien(session) };
+}
+
+async function saveLitmas(session: SessionPayload, id: string | undefined, payload: Record<string, unknown>) {
+  if (!canManageKlien(session)) return forbidden("Hanya user UPT yang dapat mengelola Litmas.");
+  const c = cleanLitmas(payload);
+  if (c.error) return { success: false, message: c.error };
+  const rec = c.rec as Record<string, unknown>;
+  const now = new Date().toISOString();
+  let litmasId = id;
+  let versi = 1;
+  let aksi = "Dibuat";
+  if (id) {
+    const old = await litmasInScope(session, id);
+    if (!old || old.upt_id !== session.upt_id) return forbidden("Data Litmas tidak ditemukan.");
+    versi = (old.versi as number) + 1;
+    aksi = "Diperbarui";
+    const { error } = await supabase
+      .from("litmas")
+      .update({ ...rec, versi, updated_by: session.username, updated_at: now })
+      .eq("id", id);
+    if (error) return { success: false, message: "Gagal menyimpan: " + error.message };
+  } else {
+    const kid = String(payload?.klien_id ?? "");
+    const k = await klienInScope(session, kid);
+    if (!k || k.upt_id !== session.upt_id) return { success: false, message: "Klien tidak ditemukan." };
+    const { data, error } = await supabase
+      .from("litmas")
+      .insert({ ...rec, klien_id: kid, upt_id: session.upt_id, created_by: session.username, updated_by: session.username })
+      .select("id")
+      .single();
+    if (error) return { success: false, message: "Gagal menyimpan: " + error.message };
+    litmasId = data.id as string;
+  }
+  const { error: hErr } = await supabase.from("litmas_history").insert({
+    litmas_id: litmasId, versi, aksi, oleh: session.nama || session.username, waktu: now,
+    snapshot: { ...rec },
+  });
+  if (hErr) return { success: false, message: "Litmas tersimpan, tetapi riwayat gagal dicatat: " + hErr.message };
+  return { success: true, id: litmasId, versi, message: id ? "Litmas diperbarui (versi " + versi + ")." : "Litmas berhasil disimpan." };
+}
+
+async function deleteLitmas(session: SessionPayload, id: string) {
+  if (!canManageKlien(session)) return forbidden("Hanya user UPT yang dapat menghapus Litmas.");
+  const rec = await litmasInScope(session, id);
+  if (!rec || rec.upt_id !== session.upt_id) return forbidden("Data Litmas tidak ditemukan.");
+  const { error } = await supabase.from("litmas").delete().eq("id", id);
+  if (error) return { success: false, message: "Gagal menghapus: " + error.message };
+  return { success: true, message: "Litmas dihapus." };
 }

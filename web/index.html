@@ -212,6 +212,12 @@
     <li class="nav-item" id="tabPelacakanContainer">
       <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabPelacakan" type="button" onclick="loadPelacakan()">Pelacakan Klien</button>
     </li>
+    <li class="nav-item" id="tabLitmasContainer">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabLitmas" type="button" onclick="loadLitmasList()">Daftar Litmas</button>
+    </li>
+    <li class="nav-item d-none" id="tabLitmasFormContainer">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabLitmasForm" type="button" onclick="litmasBaru()">Litmas Baru</button>
+    </li>
     <li class="nav-item">
       <button class="nav-link fw-bold text-primary" data-bs-toggle="tab" data-bs-target="#tabDashboard" type="button" onclick="loadDataList()">📋 Data Asesmen</button>
     </li>
@@ -571,6 +577,54 @@
       <div id="plDetail" class="mt-3"></div>
     </div>
 
+    <!-- LITMAS: DAFTAR -->
+    <div class="tab-pane fade" id="tabLitmas">
+      <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+        <h5 class="m-0">Daftar Litmas <small class="text-muted" id="lmCount"></small></h5>
+        <button class="btn btn-sm btn-primary d-none" id="btnLitmasBaru" onclick="sideBtn(SIDE_MENU[4].children[1]).click()">➕ Litmas Baru</button>
+      </div>
+      <input type="search" id="lmSearch" class="form-control form-control-sm mb-2" placeholder="Cari nama klien / no register / no litmas..." oninput="renderLitmasTable()">
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle">
+          <thead class="table-light"><tr><th>No</th><th>No Litmas</th><th>Klien</th><th>Jenis Litmas</th><th>Versi</th><th>Terakhir Diubah</th><th class="th-upt-lm d-none">UPT</th><th style="min-width:170px;">Aksi</th></tr></thead>
+          <tbody id="lmBody"><tr><td colspan="8" class="text-center text-muted">Memuat...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- LITMAS: FORM -->
+    <div class="tab-pane fade" id="tabLitmasForm">
+      <h5 class="mb-3" id="lmFormTitle">Litmas Baru</h5>
+      <div class="card card-body mb-3" style="background:#e6fffa;border-color:#319795;" id="lmAiBox">
+        <div class="fw-bold mb-1">Isi otomatis dengan AI (Gemini)</div>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+          <input type="file" id="lmAiFile" class="form-control form-control-sm" style="max-width:360px;" accept="application/pdf,image/jpeg,image/png">
+          <button type="button" class="btn btn-sm btn-success" onclick="litmasAi()">Ekstrak Data dari Berkas</button>
+        </div>
+        <div class="small text-muted mt-1">Surat permintaan / putusan / transkrip (PDF, JPG, PNG). Hasil ekstraksi mengisi formulir dan tetap perlu diperiksa.</div>
+        <div id="lmAiStatus" class="small mt-1"></div>
+      </div>
+      <fieldset id="lmFieldset">
+        <div class="row g-2 mb-2">
+          <div class="col-md-8"><label class="form-label fw-bold">Klien (dari modul Registrasi)</label><select id="lm_klien" class="form-select" onchange="litmasPilihKlien(this.value)"></select></div>
+          <div class="col-md-4"><label class="form-label fw-bold">Jenis Litmas</label><select id="lm_jenis" class="form-select" onchange="renderLitmasDinamis()"></select></div>
+        </div>
+        <div id="lmFormBody"></div>
+      </fieldset>
+      <div class="d-flex flex-wrap gap-2 mt-3">
+        <button class="btn btn-primary" id="btnLitmasSimpan" onclick="simpanLitmas()">💾 Simpan</button>
+        <button class="btn btn-warning" onclick="cetakLitmas()">🖨️ Cetak Laporan</button>
+        <button class="btn btn-outline-secondary" onclick="sideBtn(SIDE_MENU[4].children[0]).click()">Kembali ke daftar</button>
+      </div>
+      <div id="lmHistoryBox" class="mt-4 d-none">
+        <h6>Riwayat Perubahan Litmas</h6>
+        <div class="table-responsive"><table class="table table-sm table-bordered align-middle">
+          <thead class="table-light"><tr><th>Versi</th><th>Aksi</th><th>Oleh</th><th>Waktu</th><th>Perubahan</th></tr></thead>
+          <tbody id="lmHistBody"></tbody>
+        </table></div>
+      </div>
+    </div>
+
     <!-- KELOLA USER -->
     <div class="tab-pane fade" id="tabUser">
       <div class="d-flex justify-content-between align-items-center mb-3">
@@ -721,9 +775,7 @@
   // Menyesuaikan tab & tombol yang tampil sesuai tingkat organisasi user login.
   // User tingkat UPT (termasuk Kepala Bapas) tidak mendapat perubahan apapun.
   // Enam modul utama STAR-PK. Ubah aktif:true saat modul siap; sementara disembunyikan.
-  // Fitur Asesmen Rehabilitasi dan Reedukasi nantinya berada di bawah modul Litmas.
   const MODUL_UTAMA = [
-    { nama: 'Penelitian Kemasyarakatan (Litmas)', icon: 'bi-journal-text', aktif: false },
     { nama: 'Pendampingan', icon: 'bi-people', aktif: false },
     { nama: 'Pembimbingan', icon: 'bi-person-check', aktif: false },
     { nama: 'Sidang TPP', icon: 'bi-hammer', aktif: false }
@@ -741,6 +793,10 @@
       { label: 'Data Asesmen', icon: 'bi-table', box: 'tabDashboard', tab: true },
       { label: 'Asesmen Baru', icon: 'bi-plus-circle', box: 'tabFormContainer' },
       { label: 'Dashboard Eksekutif', icon: 'bi-bar-chart-line', box: 'tabEksekutifContainer' }
+    ]},
+    { label: 'Penelitian Kemasyarakatan (Litmas)', icon: 'bi-journal-text', children: [
+      { label: 'Daftar Litmas', icon: 'bi-journal-text', box: 'tabLitmasContainer' },
+      { label: 'Litmas Baru', icon: 'bi-journal-plus', box: 'tabLitmasFormContainer' }
     ]},
     { label: 'Administrasi', icon: 'bi-gear', children: [
       { label: 'Kelola Wilayah', icon: 'bi-buildings', box: 'tabWilayahContainer' },
@@ -786,7 +842,7 @@
     document.getElementById('welGreet').innerText = 'Selamat ' + (hr < 11 ? 'pagi' : hr < 15 ? 'siang' : hr < 18 ? 'sore' : 'malam');
     document.getElementById('welNama').innerText = asr;
     document.getElementById('welInfo').innerText = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) + (userJabatan ? ' · ' + userJabatan : '') + ' · ' + ({ UPT: 'UPT', KANWIL: 'Kanwil', DITJEN: 'Ditjenpas' }[userTingkat] || '');
-    document.getElementById('berandaCards').innerHTML = `<div class="col-md-6 col-xl-4"><div class="mod-card" onclick="sideBtn(SIDE_MENU[1].children[0]).click()"><div class="ic"><i class="bi bi-person-vcard"></i></div><div><div class="fw-bold" style="color:#0E203C;">Registrasi</div><small class="text-muted">Database dan profil klien Balai Pemasyarakatan</small></div></div></div><div class="col-md-6 col-xl-4"><div class="mod-card" onclick="sideBtn(SIDE_MENU[2].children[0]).click()"><div class="ic"><i class="bi bi-eye"></i></div><div><div class="fw-bold" style="color:#0E203C;">Pengawasan</div><small class="text-muted">Pelacakan lokasi dan presensi klien</small></div></div></div><div class="col-md-6 col-xl-4"><div class="mod-card" onclick="sideBtn(SIDE_MENU[3].children[0]).click()"><div class="ic"><i class="bi bi-clipboard2-pulse"></i></div><div><div class="fw-bold" style="color:#0E203C;">Asesmen Rehabilitasi dan Reedukasi</div><small class="text-muted">Input, kelola, dan cetak hasil asesmen warga binaan</small></div></div></div>`;
+    document.getElementById('berandaCards').innerHTML = `<div class="col-md-6 col-xl-4"><div class="mod-card" onclick="sideBtn(SIDE_MENU[1].children[0]).click()"><div class="ic"><i class="bi bi-person-vcard"></i></div><div><div class="fw-bold" style="color:#0E203C;">Registrasi</div><small class="text-muted">Database dan profil klien Balai Pemasyarakatan</small></div></div></div><div class="col-md-6 col-xl-4"><div class="mod-card" onclick="sideBtn(SIDE_MENU[2].children[0]).click()"><div class="ic"><i class="bi bi-eye"></i></div><div><div class="fw-bold" style="color:#0E203C;">Pengawasan</div><small class="text-muted">Pelacakan lokasi dan presensi klien</small></div></div></div><div class="col-md-6 col-xl-4"><div class="mod-card" onclick="sideBtn(SIDE_MENU[3].children[0]).click()"><div class="ic"><i class="bi bi-clipboard2-pulse"></i></div><div><div class="fw-bold" style="color:#0E203C;">Asesmen Rehabilitasi dan Reedukasi</div><small class="text-muted">Input, kelola, dan cetak hasil asesmen warga binaan</small></div></div></div><div class="col-md-6 col-xl-4"><div class="mod-card" onclick="sideBtn(SIDE_MENU[4].children[0]).click()"><div class="ic"><i class="bi bi-journal-text"></i></div><div><div class="fw-bold" style="color:#0E203C;">Penelitian Kemasyarakatan (Litmas)</div><small class="text-muted">Laporan Litmas dengan riwayat perubahan dan ekstraksi AI</small></div></div></div>`;
     syncSidebar();
     loadFoto();
   }
@@ -1831,6 +1887,289 @@
       alert(r.message);
       if (r.success) loadPelacakan();
     });
+  }
+
+  // ===== LITMAS =====
+  const LITMAS_WORKER = 'https://star-litmas.be-bapas.workers.dev';
+  const LITMAS_JENIS = {
+    1: { nama: 'Penanganan Anak Belum Berumur 12 Tahun', judul: 'PENANGANAN ANAK YANG BELUM BERUMUR 12 TAHUN', f: [['tanggapanPihak', 'Tanggapan Berbagai Pihak']] },
+    2: { nama: 'Diversi (Anak)', judul: 'DIVERSI (ANAK)', f: [['kondisiKlienAnak', 'Kondisi Klien Anak']] },
+    3: { nama: 'Sidang Pengadilan Anak', judul: 'SIDANG PENGADILAN ANAK', f: [['kondisiKlienAnak', 'Kondisi Klien Anak'], ['pelaksanaanDiversi', 'Pelaksanaan Diversi Sebelumnya']] },
+    4: { nama: 'Saksi / Korban', judul: 'SAKSI / KORBAN', f: [['keteranganSaksiKorban', 'Keterangan Saksi / Korban'], ['akibatTindakPidana', 'Akibat Tindak Pidana']] },
+    5: { nama: 'Tersangka Dewasa', judul: 'TERSANGKA DEWASA', f: [['kondisiKeluarga', 'Kondisi Keluarga']] },
+    6: { nama: 'Perawatan Anak di LPAS & Tahanan di RUTAN', judul: 'PERAWATAN ANAK DI LPAS / TAHANAN DI RUTAN', f: [['saranaPrasarana', 'Sarana Prasarana & Potensi Sistem Sumber']] },
+    7: { nama: 'Pembinaan Awal Anak / Narapidana', judul: 'PROGRAM PEMBINAAN AWAL ANAK / NARAPIDANA', f: [['kondisiLapas', 'Kondisi Objektif LAPAS / LPKA']] },
+    8: { nama: 'Pembinaan Lanjutan Anak / Narapidana', judul: 'PROGRAM PEMBINAAN LANJUTAN ANAK / NARAPIDANA', f: [['kondisiLapas', 'Kondisi Objektif LAPAS / LPKA'], ['evaluasiPembinaan', 'Evaluasi Pembinaan']] },
+    9: { nama: 'Program Asimilasi, PB, CB, CMB & CMK', judul: 'PROGRAM INTEGRASI (ASIMILASI / PB / CB / CMB / CMK)', f: [['kondisiPenjamin', 'Kondisi Penjamin'], ['evaluasiLapas', 'Evaluasi Pembinaan di LAPAS']] },
+    10: { nama: 'Pemindahan Narapidana / Anak', judul: 'PEMINDAHAN NARAPIDANA / ANAK', f: [['perkembanganAsal', 'Perkembangan Pembinaan Tempat Asal'], ['programTujuan', 'Program Pembinaan Tempat Tujuan']] },
+    11: { nama: 'Perubahan Pidana Mati / Seumur Hidup', judul: 'USULAN PERUBAHAN PIDANA (MATI KE SEUMUR HIDUP / SEUMUR HIDUP KE SEMENTARA)', f: [['perkembanganLapas', 'Perkembangan Pembinaan di LAPAS']] },
+    12: { nama: 'Permintaan Instansi Lain', judul: 'PERMINTAAN INSTANSI LAIN BAGI ANAK / NARAPIDANA', f: [['kronologisPeristiwa', 'Kronologis Peristiwa']] },
+    13: { nama: 'Program Pembimbingan Klien', judul: 'PROGRAM PEMBIMBINGAN KLIEN', f: [['potensiKlien', 'Potensi Klien'], ['permasalahanKebutuhan', 'Permasalahan & Kebutuhan Klien']] }
+  };
+  // [grup, kunci, label, tipe, kolom-penuh]
+  const LITMAS_FIELDS = [
+    ['Atribut Surat & Bapas', [
+      ['header', 'kementerian', 'Kementerian'], ['header', 'kanwil', 'Kanwil Ditjenpas'],
+      ['header', 'bapas', 'Nama Bapas'], ['top', 'no_reg_litmas', 'No. Registrasi Litmas'],
+      ['header', 'alamat', 'Alamat & Email Bapas', 'full'], ['top', 'tgl_laporan', 'Kota & Tanggal Laporan', 'full']]],
+    ['Pendahuluan', [['top', 'pendahuluan', 'Dasar pelaksanaan Litmas', 'area']]],
+    ['Identitas Klien & Penjamin', [
+      ['identitas', 'nama', 'Nama Lengkap Klien'], ['identitas', 'no_reg', 'No. Register'],
+      ['identitas', 'ttl', 'Tempat, Tanggal Lahir'], ['identitas', 'jk_agama', 'Jenis Kelamin / Agama'],
+      ['identitas', 'pend_pekerjaan', 'Pendidikan / Pekerjaan'], ['identitas', 'status_suku', 'Status Perkawinan / Suku / WN'],
+      ['identitas', 'alamat', 'Alamat Klien', 'full'], ['identitas', 'penjamin', 'Nama Penjamin & Hubungan'], ['identitas', 'kontak_penjamin', 'Pekerjaan / Kontak Penjamin']]],
+    ['Riwayat Hidup & Tindak Pidana', [
+      ['riwayat', 'hidup', 'Riwayat Kelahiran & Perkembangan', 'area'], ['riwayat', 'pendidikan', 'Riwayat Pendidikan & Tingkah Laku', 'area'],
+      ['riwayat', 'tindak_pidana', 'Riwayat Tindak Pidana', 'area']]]
+  ];
+  const LITMAS_PEJABAT = [['kepala_nama', 'Nama Kepala Bapas'], ['kepala_nip', 'NIP Kepala Bapas'], ['pk_nama', 'Nama Pembimbing Kemasyarakatan (PK)'], ['pk_nip', 'NIP PK']];
+  const LITMAS_LABEL = { no_reg_litmas: 'No. Registrasi', tgl_laporan: 'Tanggal laporan', pendahuluan: 'Pendahuluan', analisis: 'Analisis', kesimpulan: 'Kesimpulan', rekomendasi: 'Rekomendasi', jenis_litmas: 'Jenis Litmas' };
+  let litmasData = [], litmasCanManage = false, litmasKonteks = null, litmasEditId = null, litmasHist = [];
+
+  const lmId = (g, k) => `lm_${g}_${k}`;
+  const lmEl = (g, k) => document.getElementById(lmId(g, k));
+  const lmVal = (g, k) => { const e = lmEl(g, k); return e ? e.value : ''; };
+  const lmSet = (g, k, v) => { const e = lmEl(g, k); if (e && v != null && v !== '') e.value = v; };
+
+  function lmInput(g, k, label, tipe) {
+    const id = lmId(g, k);
+    const ctl = tipe === 'area' ? `<textarea id="${id}" class="form-control" rows="4"></textarea>` : `<input type="text" id="${id}" class="form-control">`;
+    return `<div class="${tipe === 'full' || tipe === 'area' ? 'col-12' : 'col-md-6'}"><label class="form-label small fw-bold mb-1">${label}</label>${ctl}</div>`;
+  }
+
+  function buildLitmasForm() {
+    document.getElementById('lm_jenis').innerHTML = Object.entries(LITMAS_JENIS).map(([k, v]) => `<option value="${k}">${k}. ${escHtml(v.nama)}</option>`).join('');
+    const blok = (judul, isi, extra = '') => `<div class="card card-body mb-3 ${extra}"><h6 class="mb-2">${judul}</h6><div class="row g-2">${isi}</div></div>`;
+    document.getElementById('lmFormBody').innerHTML =
+      LITMAS_FIELDS.map(([judul, f]) => blok(judul, f.map(([g, k, l, t]) => lmInput(g, k, l, t)).join(''))).join('') +
+      `<div class="card card-body mb-3" style="background:#f0fff4;border-color:#38a169;"><h6 class="mb-2" id="lmDinTitle">Komponen Spesifik & Analisis</h6><div class="row g-2" id="lmDinamis"></div></div>` +
+      blok('Pejabat (Tanda Tangan)', LITMAS_PEJABAT.map(([k, l]) => lmInput('pejabat', k, l)).join(''));
+    renderLitmasDinamis();
+  }
+
+  function renderLitmasDinamis() {
+    const old = {};
+    document.querySelectorAll('#lmDinamis [data-lmd]').forEach(e => old[e.id] = e.value);
+    const j = LITMAS_JENIS[document.getElementById('lm_jenis').value] || LITMAS_JENIS[1];
+    document.getElementById('lmDinTitle').innerText = 'Komponen Spesifik & Analisis — ' + j.judul;
+    const area = (g, k, l, red) => `<div class="col-12"><label class="form-label small fw-bold mb-1 ${red ? 'text-danger' : ''}">${l}</label><textarea id="${lmId(g, k)}" data-lmd="1" class="form-control" rows="4"></textarea></div>`;
+    document.getElementById('lmDinamis').innerHTML = j.f.map(([k, l]) => area('komponen', k, l)).join('') +
+      area('top', 'analisis', 'ANALISIS', true) + area('top', 'kesimpulan', 'KESIMPULAN', true) + area('top', 'rekomendasi', 'REKOMENDASI', true);
+    Object.entries(old).forEach(([id, v]) => { const e = document.getElementById(id); if (e) e.value = v; });
+  }
+
+  function loadLitmasList() {
+    return callApi('listLitmas').then(r => {
+      if (!r.success) { document.getElementById('lmBody').innerHTML = `<tr><td colspan="8" class="text-danger text-center">${escHtml(r.message)}</td></tr>`; return; }
+      litmasData = r.data || []; litmasCanManage = !!r.can_manage; litmasKonteks = r.konteks || null;
+      document.getElementById('btnLitmasBaru').classList.toggle('d-none', !litmasCanManage);
+      document.getElementById('tabLitmasFormContainer').classList.toggle('d-none', !litmasCanManage);
+      document.querySelectorAll('.th-upt-lm').forEach(e => e.classList.toggle('d-none', userTingkat === 'UPT'));
+      renderLitmasTable();
+    });
+  }
+
+  function renderLitmasTable() {
+    const q = document.getElementById('lmSearch').value.trim().toLowerCase();
+    const rows = litmasData.filter(l => !q || [l.klien && l.klien.nama, l.klien && l.klien.no_register, l.no_reg_litmas].some(v => (v || '').toLowerCase().includes(q)));
+    document.getElementById('lmCount').innerText = `(${rows.length})`;
+    const showUpt = userTingkat !== 'UPT';
+    document.getElementById('lmBody').innerHTML = rows.length ? rows.map((l, i) => `<tr>
+      <td>${i + 1}</td><td>${escHtml(l.no_reg_litmas || '-')}</td>
+      <td>${escHtml(l.klien ? l.klien.nama : '-')}<div class="small text-muted">${escHtml(l.klien ? l.klien.no_register : '')}</div></td>
+      <td>${escHtml((LITMAS_JENIS[l.jenis_litmas] || {}).nama || l.jenis_litmas)}</td>
+      <td><span class="badge bg-secondary">v${l.versi}</span></td>
+      <td>${fmtWaktuPl(l.updated_at)}<div class="small text-muted">${escHtml(l.updated_by || '')}</div></td>
+      ${showUpt ? `<td>${escHtml(l.upt ? l.upt.nama : '')}</td>` : ''}
+      <td><button class="btn btn-sm btn-outline-primary" onclick="bukaLitmas('${l.id}')">${litmasCanManage ? 'Ubah' : 'Lihat'}</button>
+      ${litmasCanManage ? `<button class="btn btn-sm btn-outline-danger ms-1" onclick="hapusLitmas('${l.id}')">Hapus</button>` : ''}</td></tr>`).join('')
+      : `<tr><td colspan="${showUpt ? 8 : 7}" class="text-center text-muted">Belum ada data Litmas.</td></tr>`;
+  }
+
+  function litmasSiapkanForm() {
+    if (!document.getElementById('lmFormBody').children.length) buildLitmasForm();
+    return loadKlienList().then(() => {
+      document.getElementById('lm_klien').innerHTML = '<option value="">-- Pilih klien --</option>' + allKlien.map(k => `<option value="${k.id}">${escHtml(k.no_register)} - ${escHtml(k.nama)}</option>`).join('');
+    });
+  }
+
+  function litmasKosongkan() {
+    document.querySelectorAll('#lmFormBody input, #lmFormBody textarea').forEach(e => e.value = '');
+    document.getElementById('lm_jenis').value = '1';
+    renderLitmasDinamis();
+    lmSet('header', 'kementerian', 'KEMENTERIAN IMIGRASI DAN PEMASYARAKATAN R.I.');
+    if (litmasKonteks) {
+      lmSet('header', 'kanwil', 'KANTOR WILAYAH DIREKTORAT JENDERAL PEMASYARAKATAN ' + (litmasKonteks.kanwil_nama || '').toUpperCase().replace(/^KANWIL\s+/, ''));
+      lmSet('header', 'bapas', (litmasKonteks.upt_nama || '').toUpperCase());
+    }
+    lmSet('pejabat', 'pk_nama', asr);
+  }
+
+  function litmasMode(edit) {
+    document.getElementById('lmFieldset').disabled = !edit;
+    document.getElementById('btnLitmasSimpan').classList.toggle('d-none', !edit);
+    document.getElementById('lmAiBox').classList.toggle('d-none', !edit);
+  }
+
+  let litmasSkipReset = false;
+  function litmasBaru() {
+    if (litmasSkipReset) { litmasSkipReset = false; return Promise.resolve(); }
+    litmasEditId = null;
+    return (litmasKonteks || !litmasCanManage ? Promise.resolve() : callApi('listLitmas').then(r => { litmasKonteks = r.konteks || null; litmasCanManage = !!r.can_manage; }))
+      .then(litmasSiapkanForm).then(() => {
+        document.getElementById('lmFormTitle').innerText = 'Litmas Baru';
+        document.getElementById('lm_klien').disabled = false;
+        document.getElementById('lmHistoryBox').classList.add('d-none');
+        document.getElementById('lmAiStatus').innerText = '';
+        litmasKosongkan(); litmasMode(true);
+      });
+  }
+
+  function litmasPilihKlien(id) {
+    const k = allKlien.find(x => x.id === id);
+    if (!k) return;
+    const ttl = k.tanggal_lahir ? fmtTgl(k.tanggal_lahir) : '';
+    const gab = (...a) => a.filter(Boolean).join(' / ');
+    const set = (key, v) => { const e = lmEl('identitas', key); if (e) e.value = v || ''; };
+    set('nama', k.nama); set('no_reg', k.no_register); set('ttl', ttl); set('jk_agama', k.agama || '');
+    set('pend_pekerjaan', gab(k.pendidikan_terakhir, k.pekerjaan)); set('status_suku', gab(k.status_pernikahan, k.kewarganegaraan));
+    set('alamat', k.alamat); set('penjamin', k.nama_penjamin); set('kontak_penjamin', k.no_hp_penjamin);
+    const tp = [k.perkara, k.pasal && 'Pasal ' + k.pasal, k.lama_pidana && 'Lama pidana ' + k.lama_pidana].filter(Boolean).join(', ');
+    if (tp && !lmVal('riwayat', 'tindak_pidana')) lmSet('riwayat', 'tindak_pidana', tp);
+  }
+
+  function bukaLitmas(id) {
+    return callApi('getLitmas', { id }).then(r => {
+      if (!r.success) { alert(r.message); return; }
+      return litmasSiapkanForm().then(() => {
+        const d = r.data, edit = !!r.can_manage && userTingkat === 'UPT';
+        litmasEditId = d.id; litmasHist = r.riwayat || [];
+        document.getElementById('lm_klien').value = d.klien_id;
+        document.getElementById('lm_klien').disabled = true;
+        document.getElementById('lm_jenis').value = d.jenis_litmas;
+        renderLitmasDinamis();
+        isiLitmasForm(d);
+        document.getElementById('lmFormTitle').innerText = (edit ? 'Ubah Litmas' : 'Lihat Litmas') + ` (versi ${d.versi})`;
+        document.getElementById('lmAiStatus').innerText = '';
+        litmasMode(edit); renderLitmasRiwayat();
+        litmasSkipReset = true;
+        document.querySelector('#mainTabs [data-bs-target="#tabLitmasForm"]').click();
+      });
+    });
+  }
+
+  function isiLitmasForm(d) {
+    ['no_reg_litmas', 'tgl_laporan', 'pendahuluan', 'analisis', 'kesimpulan', 'rekomendasi'].forEach(k => { const e = lmEl('top', k); if (e) e.value = d[k] || ''; });
+    ['header', 'identitas', 'riwayat', 'komponen', 'pejabat'].forEach(g => Object.entries(d[g] || {}).forEach(([k, v]) => { const e = lmEl(g, k); if (e) e.value = v; }));
+  }
+
+  function kumpulLitmas() {
+    const p = { jenis_litmas: Number(document.getElementById('lm_jenis').value) };
+    ['no_reg_litmas', 'tgl_laporan', 'pendahuluan', 'analisis', 'kesimpulan', 'rekomendasi'].forEach(k => p[k] = lmVal('top', k));
+    ['header', 'identitas', 'riwayat', 'pejabat'].forEach(g => {
+      p[g] = {};
+      document.querySelectorAll(`[id^="lm_${g}_"]`).forEach(e => p[g][e.id.slice(g.length + 4)] = e.value);
+    });
+    p.komponen = {};
+    LITMAS_JENIS[p.jenis_litmas].f.forEach(([k]) => p.komponen[k] = lmVal('komponen', k));
+    return p;
+  }
+
+  function simpanLitmas() {
+    const p = kumpulLitmas();
+    if (!litmasEditId) {
+      p.klien_id = document.getElementById('lm_klien').value;
+      if (!p.klien_id) { alert('Pilih klien terlebih dahulu.'); return; }
+    }
+    if (!p.analisis.trim() || !p.kesimpulan.trim() || !p.rekomendasi.trim()) { alert('Analisis, Kesimpulan, dan Rekomendasi wajib diisi.'); return; }
+    const btn = document.getElementById('btnLitmasSimpan'); btn.disabled = true;
+    callApi('saveLitmas', { id: litmasEditId, payload: p }).then(r => {
+      btn.disabled = false; alert(r.message);
+      if (r.success) bukaLitmas(r.id);
+    });
+  }
+
+  function hapusLitmas(id) {
+    if (!confirm('Hapus Litmas ini beserta seluruh riwayat perubahannya?')) return;
+    callApi('deleteLitmas', { id }).then(r => { alert(r.message); if (r.success) loadLitmasList(); });
+  }
+
+  // Riwayat: bandingkan snapshot versi ini dengan versi sebelumnya.
+  function litmasFlat(sn) {
+    const o = {};
+    Object.entries(sn || {}).forEach(([k, v]) => {
+      if (v && typeof v === 'object') Object.entries(v).forEach(([kk, vv]) => o[k + '.' + kk] = vv); else o[k] = v;
+    });
+    return o;
+  }
+  const litmasNamaField = k => {
+    const [g, kk] = k.includes('.') ? k.split('.') : [null, k];
+    if (!g) return LITMAS_LABEL[kk] || kk;
+    for (const [, f] of LITMAS_FIELDS) { const x = f.find(a => a[0] === g && a[1] === kk); if (x) return x[2]; }
+    const p = LITMAS_PEJABAT.find(a => a[0] === kk); if (g === 'pejabat' && p) return p[1];
+    for (const j of Object.values(LITMAS_JENIS)) { const x = j.f.find(a => a[0] === kk); if (g === 'komponen' && x) return x[1]; }
+    return kk;
+  };
+  function litmasPerubahan(i) {
+    const cur = litmasFlat(litmasHist[i].snapshot), prev = litmasHist[i + 1] ? litmasFlat(litmasHist[i + 1].snapshot) : null;
+    if (!prev) return '<span class="text-muted">Versi awal</span>';
+    const ch = Object.keys({ ...cur, ...prev }).filter(k => String(cur[k] ?? '') !== String(prev[k] ?? ''));
+    return ch.length ? ch.map(k => `<span class="badge bg-light text-dark border me-1" title="${escHtml(String(prev[k] ?? '').slice(0, 200))} → ${escHtml(String(cur[k] ?? '').slice(0, 200))}">${escHtml(litmasNamaField(k))}</span>`).join('') : '<span class="text-muted">Tanpa perubahan isi</span>';
+  }
+  function renderLitmasRiwayat() {
+    document.getElementById('lmHistoryBox').classList.toggle('d-none', !litmasHist.length);
+    document.getElementById('lmHistBody').innerHTML = litmasHist.map((h, i) => `<tr><td>v${h.versi}</td><td>${escHtml(h.aksi)}</td><td>${escHtml(h.oleh || '')}</td><td>${fmtWaktuPl(h.waktu)}</td><td>${litmasPerubahan(i)}</td></tr>`).join('');
+  }
+
+  function litmasAi() {
+    const f = document.getElementById('lmAiFile').files[0], st = document.getElementById('lmAiStatus');
+    if (!f) { alert('Pilih berkas PDF/JPG/PNG terlebih dahulu.'); return; }
+    if (f.size > 8 * 1024 * 1024) { alert('Ukuran berkas maksimal 8 MB.'); return; }
+    st.className = 'small mt-1 text-muted'; st.innerText = 'Mengirim berkas ke AI, mohon tunggu...';
+    const rd = new FileReader();
+    rd.onload = e => {
+      fetch(LITMAS_WORKER + '/api/extract', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileBase64: String(e.target.result).split(',')[1], mimeType: f.type }) })
+        .then(r => r.json()).then(d => {
+          if (d.status !== 'success') { st.className = 'small mt-1 text-danger'; st.innerText = 'Gagal ekstraksi: ' + (d.message || 'tidak diketahui'); return; }
+          const x = d.extractedData || {};
+          const map = { namaKlien: ['identitas', 'nama'], noRegKlien: ['identitas', 'no_reg'], ttlKlien: ['identitas', 'ttl'], jkAgamaKlien: ['identitas', 'jk_agama'], pendPekerjaanKlien: ['identitas', 'pend_pekerjaan'], statusSukuKlien: ['identitas', 'status_suku'], alamatKlien: ['identitas', 'alamat'], namaPenjamin: ['identitas', 'penjamin'], kontakPenjamin: ['identitas', 'kontak_penjamin'], riwayatTindakPidana: ['riwayat', 'tindak_pidana'], pendahuluan: ['top', 'pendahuluan'], analisis: ['top', 'analisis'], kesimpulan: ['top', 'kesimpulan'] };
+          Object.entries(map).forEach(([k, [g, kk]]) => { if (x[k]) lmSet(g, kk, typeof x[k] === 'string' ? x[k] : JSON.stringify(x[k])); });
+          st.className = 'small mt-1 text-success'; st.innerText = 'Berhasil. Data diisikan dari berkas; mohon periksa kembali sebelum menyimpan.';
+        }).catch(err => { st.className = 'small mt-1 text-danger'; st.innerText = 'Gagal terhubung ke layanan AI: ' + err; });
+    };
+    rd.readAsDataURL(f);
+  }
+
+  function cetakLitmas() {
+    const p = kumpulLitmas(), j = LITMAS_JENIS[p.jenis_litmas], h = p.header, i = p.identitas, r = p.riwayat, pj = p.pejabat;
+    const e = escHtml, par = t => `<p style="white-space:pre-line;margin:4px 0;">${e(t)}</p>`;
+    const logo = new URL('logo-kemenimipas.png', location.href).href;
+    const baris = [['Nama Klien', i.nama], ['No. Register', i.no_reg], ['Tempat, Tanggal Lahir', i.ttl], ['Jenis Kelamin / Agama', i.jk_agama], ['Pendidikan / Pekerjaan', i.pend_pekerjaan], ['Status / Suku / WN', i.status_suku], ['Alamat Tempat Tinggal', i.alamat], ['Nama Penjamin', i.penjamin], ['Kontak Penjamin', i.kontak_penjamin]];
+    const dyn = j.f.map(([k, l]) => `<div class="st">${e(l)}</div>${par(p.komponen[k])}`).join('');
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Litmas ${e(i.nama)}</title><style>
+      @page{size:A4;margin:15mm}body{font-family:"Times New Roman",serif;font-size:11pt;line-height:1.4;color:#000}
+      .kop{display:flex;align-items:center;border-bottom:3px double #000;padding-bottom:8px;margin-bottom:12px}.kop img{width:80px;margin-right:15px}
+      .kop div{flex:1;text-align:center}.kop h2{margin:0;font-size:11pt;text-transform:uppercase}.kop h1{margin:2px 0;font-size:12pt;text-transform:uppercase}.kop p{margin:0;font-size:9pt}
+      .jd{text-align:center;margin:14px 0;font-weight:bold;font-size:12pt;text-decoration:underline;text-transform:uppercase}.st{font-weight:bold;margin-top:14px;text-transform:uppercase}
+      table{width:100%;border-collapse:collapse;margin:6px 0}td{border:1px solid #000;padding:4px;font-size:10pt}.ttd td{border:0;text-align:center;width:50%;vertical-align:top}.rh{text-align:right;font-weight:bold;font-size:10pt}
+    </style></head><body><div class="rh">RAHASIA</div>
+      <div class="kop"><img src="${logo}"><div><h2>${e(h.kementerian)}</h2><h2>${e(h.kanwil)}</h2><h1>${e(h.bapas)}</h1><p>${e(h.alamat)}</p></div></div>
+      <div class="rh">RAHASIA</div>
+      <div class="jd">LAPORAN HASIL PENELITIAN KEMASYARAKATAN<br>${e(j.judul)}</div>
+      ${p.no_reg_litmas ? `<p style="text-align:center;margin:0;">No. ${e(p.no_reg_litmas)}</p>` : ''}
+      <div class="st">I. Pendahuluan</div>${par(p.pendahuluan)}
+      <div class="st">II. Identitas</div><table>${baris.map(([a, b]) => `<tr><td style="width:35%">${a}</td><td>${e(b)}</td></tr>`).join('')}</table>
+      <div class="st">III. Riwayat Hidup dan Perkembangan Klien</div>${par(r.hidup)}${par(r.pendidikan)}
+      <div class="st">IV. Riwayat Tindak Pidana</div>${par(r.tindak_pidana)}
+      ${dyn}<div class="st">Analisis</div>${par(p.analisis)}
+      <div class="st">Kesimpulan dan Rekomendasi</div><p><b>A. Kesimpulan:</b></p>${par(p.kesimpulan)}<p><b>B. Rekomendasi:</b></p>${par(p.rekomendasi)}
+      <table class="ttd" style="margin-top:28px"><tr>
+        <td>Mengetahui,<br>Kepala Balai Pemasyarakatan<br><br><br><br><b>${e(pj.kepala_nama)}</b><br>NIP. ${e(pj.kepala_nip)}</td>
+        <td>${e(p.tgl_laporan)}<br>Pembimbing Kemasyarakatan<br><br><br><br><b>${e(pj.pk_nama)}</b><br>NIP. ${e(pj.pk_nip)}</td></tr></table>
+      <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`;
+    const w = window.open('', '_blank');
+    if (!w) { alert('Izinkan pop-up untuk mencetak laporan.'); return; }
+    w.document.open(); w.document.write(html); w.document.close();
   }
 
   function ubahPassword() {
