@@ -1027,7 +1027,7 @@
     }
     if (userTingkat === 'UPT') tabForm.style.display = KUNCI_APLIKASI ? 'none' : '';
 
-    if (kunciInfo.can_toggle) {
+    if (kunciInfo.can_toggle && userTingkat !== 'MITRA') {
       btnToggle.classList.remove('d-none');
       btnToggle.className = KUNCI_APLIKASI
         ? 'btn btn-sm btn-success me-2'
