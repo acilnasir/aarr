@@ -1659,7 +1659,7 @@ async function listLokasiKlien(session: SessionPayload) {
   const { data: klien, error } = await fetchSemua((from, to) => {
     let q = supabase
       .from("klien")
-      .select("id, upt_id, no_register, nama, no_hp, alamat, daerah, lat, lng, wilayah_izin, lat_pusat, long_pusat, radius_km, upt:upt_id(nama)")
+      .select("id, upt_id, no_register, nama, no_hp, alamat, daerah, lat, lng, wilayah_izin, lat_pusat, long_pusat, radius_km, pk, perkara, upt:upt_id(nama, kanwil:kanwil_id(provinsi))")
       .order("nama")
       .order("id");
     if (uptIds !== null) q = q.in("upt_id", uptIds);
