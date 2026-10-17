@@ -587,6 +587,16 @@
           <button class="btn btn-sm btn-outline-secondary" onclick="loadPelacakan()"><i class="bi bi-arrow-clockwise"></i> Muat ulang</button>
         </div>
       </div>
+      <div class="row g-2 mb-2" id="plFilter">
+        <div class="col-6 col-md-3 col-xl"><select class="form-select form-select-sm" id="plF_prov" onchange="ubahFilterPl()"></select></div>
+        <div class="col-6 col-md-3 col-xl"><select class="form-select form-select-sm" id="plF_kota" onchange="ubahFilterPl()"></select></div>
+        <div class="col-6 col-md-3 col-xl"><select class="form-select form-select-sm" id="plF_kec" onchange="ubahFilterPl()"></select></div>
+        <div class="col-6 col-md-3 col-xl"><select class="form-select form-select-sm" id="plF_kel" onchange="ubahFilterPl()"></select></div>
+        <div class="col-6 col-md-3 col-xl"><select class="form-select form-select-sm" id="plF_bapas" onchange="ubahFilterPl()"></select></div>
+        <div class="col-6 col-md-3 col-xl"><select class="form-select form-select-sm" id="plF_perkara" onchange="ubahFilterPl()"></select></div>
+        <div class="col-6 col-md-3 col-xl"><select class="form-select form-select-sm" id="plF_pk" onchange="ubahFilterPl()"></select></div>
+        <div class="col-auto"><button class="btn btn-sm btn-outline-secondary" onclick="resetFilterPl()" title="Hapus semua filter"><i class="bi bi-x-circle"></i> Reset</button></div>
+      </div>
       <div class="row g-3">
         <div class="col-lg-8"><div id="plMapWrap" style="position:relative;background:#fff;">
           <div id="plMap" style="height:440px;border-radius:8px;border:1px solid #dee2e6;"></div>
@@ -1853,6 +1863,42 @@
     if (el) el.innerHTML = `${g.lat.toFixed(6)}, ${g.lng.toFixed(6)} <a target="_blank" rel="noopener" href="https://www.google.com/maps?q=${g.lat},${g.lng}">Buka di Google Maps</a><br><small class="text-muted">Perkiraan dari alamat (hasil pencarian: ${escHtml(g.q)})</small>`;
   }
 
+  const PL_FILTER = [
+    ['prov', 'Semua provinsi', '_prov'], ['kota', 'Semua kota/kabupaten', '_kota'], ['kec', 'Semua kecamatan', '_kec'],
+    ['kel', 'Semua kelurahan/desa', '_kel'], ['bapas', 'Semua Bapas', '_bapas'], ['perkara', 'Semua perkara', '_perkara'], ['pk', 'Semua pembimbing', '_pk']
+  ];
+  const plTitle = v => (v || '').toLowerCase().replace(/(^|[\s.(\-])([a-z])/g, (m, a, b) => a + b.toUpperCase()).trim();
+  function turunkanFilterPl(k) {
+    const a = (k.alamat || '').split('/')[0];
+    const cari = re => { const m = a.match(re); return m ? plTitle(m[1]) : ''; };
+    const stop = '(?=\\s*(?:,|\\.|\\bKec\\b|\\bKab\\b|\\bKota\\b|\\bRT\\b|\\bRW\\b|\\bDsn\\b|\\bDusun\\b|\\bProv\\b|$))';
+    k._kel = cari(new RegExp('\\b(?:Desa|Ds|Kelurahan|Kel)\\b\\.?\\s+([A-Za-z\' \\-]+?)' + stop, 'i'));
+    k._kec = cari(new RegExp('\\b(?:Kecamatan|Kec)\\b\\.?\\s+([A-Za-z\' \\-]+?)' + stop, 'i'));
+    if (!k._kec && !k._kel && a && !/[,\d]/.test(a)) k._kec = plTitle(a);
+    k._kota = plTitle((k.daerah || '').replace(/^(Kab\.?|Kabupaten|Kota)\s+/i, ''));
+    k._prov = k.upt && k.upt.kanwil ? k.upt.kanwil.provinsi || '' : '';
+    k._bapas = k.upt ? k.upt.nama || '' : '';
+    k._perkara = plTitle(k.perkara);
+    k._pk = (k.pk || '').trim();
+  }
+  function plFiltered(kecuali) {
+    return plData.filter(k => PL_FILTER.every(([id, , f]) => {
+      if (id === kecuali) return true;
+      const v = document.getElementById('plF_' + id).value;
+      return !v || k[f] === v;
+    }));
+  }
+  function isiFilterPl() {
+    PL_FILTER.forEach(([id, label, f]) => {
+      const el = document.getElementById('plF_' + id), cur = el.value;
+      const opts = [...new Set(plFiltered(id).map(k => k[f]).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      el.innerHTML = `<option value="">${label}</option>` + opts.map(o => `<option value="${escHtml(o)}">${escHtml(o)}</option>`).join('');
+      el.value = opts.includes(cur) ? cur : '';
+    });
+  }
+  function ubahFilterPl() { isiFilterPl(); renderPelacakan(true); }
+  function resetFilterPl() { PL_FILTER.forEach(([id]) => document.getElementById('plF_' + id).value = ''); ubahFilterPl(); }
+
   function layarPenuhPeta() {
     const w = document.getElementById('plMapWrap');
     if (document.fullscreenElement) document.exitFullscreen();
@@ -1916,6 +1962,7 @@
     return callApi('listLokasiKlien').then(r => {
       if (!r.success) { document.getElementById('plList').innerHTML = `<div class="text-danger p-2">${escHtml(r.message)}</div>`; return; }
       plData = r.data || []; plCanManage = !!r.can_manage;
+      plData.forEach(turunkanFilterPl); isiFilterPl();
       renderPelacakan(true);
       if (plSel && plData.some(k => k.id === plSel)) bukaDetailPelacakan(plSel, false);
     });
@@ -1925,7 +1972,7 @@
     plLayer.clearLayers();
     plCluster.clearLayers();
     const alamat = plModeAlamat(), pts = [], marks = [];
-    plData.forEach(k => {
+    plFiltered().forEach(k => {
       const t = k.terakhir, st = plStatus(k, t);
       if (alamat) {
         if (k.lat == null || k.lng == null) return;
@@ -1949,10 +1996,10 @@
 
   function renderPelacakanList() {
     const q = document.getElementById('plSearch').value.trim().toLowerCase();
-    const rows = plData.filter(k => !q || (k.nama + ' ' + k.no_register).toLowerCase().includes(q));
+    const rows = plFiltered().filter(k => !q || (k.nama + ' ' + k.no_register).toLowerCase().includes(q));
     const urut = { luar: 0, dalam: 1, bebas: 2, belum: 3 };
     rows.sort((a, b) => urut[plStatus(a, a.terakhir)] - urut[plStatus(b, b.terakhir)] || a.nama.localeCompare(b.nama));
-    document.getElementById('plCount').innerText = plModeAlamat() ? `(${plData.filter(k => k.lat != null).length} dari ${plData.length} klien memiliki koordinat alamat)` : `(${plData.filter(k => k.terakhir).length} dari ${plData.length} klien sudah presensi)`;
+    document.getElementById('plCount').innerText = plModeAlamat() ? `(${plFiltered().filter(k => k.lat != null).length} dari ${plFiltered().length} klien memiliki koordinat alamat)` : `(${plFiltered().filter(k => k.terakhir).length} dari ${plFiltered().length} klien sudah presensi)`;
     document.getElementById('plList').innerHTML = rows.length ? rows.slice(0, 200).map(k => {
       const st = plStatus(k, k.terakhir);
       return `<button type="button" class="list-group-item list-group-item-action ${k.id === plSel ? 'active' : ''}" onclick="bukaDetailPelacakan('${k.id}', true)">
