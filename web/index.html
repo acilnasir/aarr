@@ -588,7 +588,9 @@
         </div>
       </div>
       <div class="row g-3">
-        <div class="col-lg-8"><div id="plMap" style="height:440px;border-radius:8px;border:1px solid #dee2e6;"></div>
+        <div class="col-lg-8"><div id="plMapWrap" style="position:relative;background:#fff;">
+          <div id="plMap" style="height:440px;border-radius:8px;border:1px solid #dee2e6;"></div>
+          <button type="button" id="plFsBtn" class="btn btn-sm btn-light border shadow-sm" style="position:absolute;top:10px;right:10px;z-index:1000;" onclick="layarPenuhPeta()" title="Layar penuh"><i class="bi bi-arrows-fullscreen"></i></button></div>
           <div class="small text-muted mt-1"><span class="text-success">●</span> Dalam wilayah izin &nbsp; <span class="text-danger">●</span> Di luar wilayah &nbsp; <span class="text-primary">●</span> Tanpa batas wilayah &nbsp; <span class="text-secondary">●</span> Belum presensi (tidak tampil di peta) &nbsp; <span style="color:#fd7e14">●</span> Alamat registrasi<br>Warna kelompok (jumlah klien): <span style="color:#3b82f6">●</span> 1–9 &nbsp; <span style="color:#fbbf24">●</span> 10–49 &nbsp; <span style="color:#fb923c">●</span> 50–99 &nbsp; <span style="color:#ef4444">●</span> ≥100. Perbesar peta untuk melihat titik sebenarnya.</div></div>
         <div class="col-lg-4">
           <input type="search" id="plSearch" class="form-control form-control-sm mb-2" placeholder="Cari nama / no register..." oninput="renderPelacakanList()">
@@ -1851,6 +1853,47 @@
     if (el) el.innerHTML = `${g.lat.toFixed(6)}, ${g.lng.toFixed(6)} <a target="_blank" rel="noopener" href="https://www.google.com/maps?q=${g.lat},${g.lng}">Buka di Google Maps</a><br><small class="text-muted">Perkiraan dari alamat (hasil pencarian: ${escHtml(g.q)})</small>`;
   }
 
+  function layarPenuhPeta() {
+    const w = document.getElementById('plMapWrap');
+    if (document.fullscreenElement) document.exitFullscreen();
+    else if (w.requestFullscreen) w.requestFullscreen();
+  }
+  document.addEventListener('fullscreenchange', () => {
+    const w = document.getElementById('plMapWrap'), m = document.getElementById('plMap'), b = document.getElementById('plFsBtn');
+    if (!w) return;
+    const full = document.fullscreenElement === w;
+    m.style.height = full ? '100vh' : '440px';
+    m.style.borderRadius = full ? '0' : '8px';
+    b.innerHTML = full ? '<i class="bi bi-fullscreen-exit"></i>' : '<i class="bi bi-arrows-fullscreen"></i>';
+    b.title = full ? 'Keluar layar penuh' : 'Layar penuh';
+    if (plMap) setTimeout(() => plMap.invalidateSize(), 150);
+  });
+
+  function isiPopupKlien(popup, id) {
+    popup.setContent('<div class="text-muted small p-2">Memuat...</div>');
+    callApi('getKlien', { id }).then(r => {
+      if (!r.success) { popup.setContent(`<span class="text-danger">${escHtml(r.message)}</span>`); return; }
+      const d = r.data, k = plData.find(x => x.id === id) || {};
+      const t = k.terakhir, plModeA = plModeAlamat();
+      const lat = plModeA ? k.lat : (t ? t.latitude : k.lat), lng = plModeA ? k.lng : (t ? t.longitude : k.lng);
+      const masa = d.tanggal_penerimaan && d.tanggal_ekspirasi ? d.tanggal_penerimaan + ' s.d. ' + d.tanggal_ekspirasi : (d.tanggal_ekspirasi ? 'berakhir ' + d.tanggal_ekspirasi : (d.tanggal_penerimaan ? 'mulai ' + d.tanggal_penerimaan : ''));
+      const bimb = [masa, d.lama_pidana ? '(' + d.lama_pidana + ')' : ''].filter(Boolean).join(' ') || '-';
+      const hp = d.no_hp ? `<a href="tel:${escHtml(d.no_hp)}">${escHtml(d.no_hp)}</a>` : '-';
+      popup.setContent(`<div style="width:250px;font-size:13px;">
+        <div class="d-flex gap-2"><img src="${d.foto || KL_FOTO_DEFAULT}" style="width:75px;height:100px;object-fit:cover;border-radius:6px;" alt="Foto">
+        <div><b>${escHtml(d.nama)}</b><br><span class="text-muted">${escHtml(d.no_register)}</span><br>${hp}</div></div>
+        <div class="mt-2"><b>Perkara:</b> ${escHtml(d.perkara || '-')}</div>
+        <div><b>Masa bimbingan:</b> ${escHtml(bimb)}</div>
+        <div><b>Alamat:</b> ${escHtml(d.alamat || '-')}</div>
+        ${lat != null ? `<div class="mt-1"><a target="_blank" rel="noopener" href="https://www.google.com/maps?q=${lat},${lng}"><i class="bi bi-geo-alt"></i> Buka di Google Maps</a></div>` : ''}</div>`);
+    });
+  }
+  function popupKlien(marker, id) {
+    const pop = L.popup({ maxWidth: 280, minWidth: 260 });
+    marker.bindPopup(pop).on('popupopen', () => isiPopupKlien(pop, id));
+    return marker;
+  }
+
   function salinLinkPresensi() {
     const url = new URL('presensi.html', location.href).href;
     (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(() => alert('Tautan disalin:\n' + url), () => prompt('Salin tautan presensi klien:', url));
@@ -1887,8 +1930,8 @@
       if (alamat) {
         if (k.lat == null || k.lng == null) return;
         pts.push([k.lat, k.lng]);
-        marks.push(L.circleMarker([k.lat, k.lng], { radius: 8, color: '#fff', weight: 2, fillColor: '#fd7e14', fillOpacity: 1 })
-          .bindTooltip(`${escHtml(k.nama)} (${escHtml(k.no_register)})<br><small>${escHtml(k.alamat || '')}</small>`).on('click', () => bukaDetailPelacakan(k.id, false)));
+        marks.push(popupKlien(L.circleMarker([k.lat, k.lng], { radius: 8, color: '#fff', weight: 2, fillColor: '#fd7e14', fillOpacity: 1 })
+          .on('click', () => bukaDetailPelacakan(k.id, false)), k.id));
         return;
       }
       if (k.lat_pusat != null && k.long_pusat != null && k.radius_km) {
@@ -1896,8 +1939,8 @@
       }
       if (!t) return;
       pts.push([t.latitude, t.longitude]);
-      marks.push(L.circleMarker([t.latitude, t.longitude], { radius: 9, color: '#fff', weight: 2, fillColor: PL_WARNA[st], fillOpacity: 1 })
-        .bindTooltip(`${escHtml(k.nama)} (${escHtml(k.no_register)})`).on('click', () => bukaDetailPelacakan(k.id, true)));
+      marks.push(popupKlien(L.circleMarker([t.latitude, t.longitude], { radius: 9, color: '#fff', weight: 2, fillColor: PL_WARNA[st], fillOpacity: 1 })
+        .on('click', () => bukaDetailPelacakan(k.id, true)), k.id));
     });
     plCluster.addLayers(marks);
     if (fit && pts.length) plMap.fitBounds(pts, { padding: [40, 40], maxZoom: 15 });
