@@ -668,7 +668,7 @@
         <div class="col-12 col-md-4"><input type="search" id="fuSearch" class="form-control form-control-sm" placeholder="Cari username / nama / jabatan..." oninput="renderUserTable()"></div>
         <div class="col-6 col-md-2" id="fuKanwilWrap"><select id="fuKanwil" class="form-select form-select-sm" onchange="onFuKanwilChange()"></select></div>
         <div class="col-6 col-md-3" id="fuUptWrap"><select id="fuUpt" class="form-select form-select-sm" onchange="renderUserTable()"></select></div>
-        <div class="col-6 col-md-1" id="fuTingkatWrap"><select id="fuTingkat" class="form-select form-select-sm" onchange="renderUserTable()"><option value="">Tingkat</option><option>UPT</option><option>KANWIL</option><option>DITJEN</option></select></div>
+        <div class="col-6 col-md-1" id="fuTingkatWrap"><select id="fuTingkat" class="form-select form-select-sm" onchange="renderUserTable()"><option value="">Tingkat</option><option>UPT</option><option>MITRA</option><option>KANWIL</option><option>DITJEN</option></select></div>
         <div class="col-6 col-md-2"><select id="fuStatus" class="form-select form-select-sm" onchange="renderUserTable()"><option value="">Semua status</option><option value="asesor">Asesor</option><option value="wali">Wali</option><option value="nakes">Tenaga Kesehatan</option><option value="__none">Tanpa status</option></select></div>
         <div class="col-12 d-flex justify-content-between align-items-center small text-muted">
           <span id="fuCount"></span>
@@ -874,7 +874,7 @@
     const hr = new Date().getHours();
     document.getElementById('welGreet').innerText = 'Selamat ' + (hr < 11 ? 'pagi' : hr < 15 ? 'siang' : hr < 18 ? 'sore' : 'malam');
     document.getElementById('welNama').innerText = asr;
-    document.getElementById('welInfo').innerText = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) + (userJabatan ? ' · ' + userJabatan : '') + ' · ' + ({ UPT: 'UPT', KANWIL: 'Kanwil', DITJEN: 'Ditjenpas' }[userTingkat] || '');
+    document.getElementById('welInfo').innerText = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) + (userJabatan ? ' · ' + userJabatan : '') + ' · ' + ({ UPT: 'UPT', KANWIL: 'Kanwil', DITJEN: 'Ditjenpas', MITRA: 'Mitra Bapas' }[userTingkat] || '');
     document.getElementById('berandaCards').innerHTML = `<div class="col-md-6 col-xl-4"><div class="mod-card" onclick="sideBtn(SIDE_MENU[1].children[0]).click()"><div class="ic"><i class="bi bi-person-vcard"></i></div><div><div class="fw-bold" style="color:#0E203C;">Registrasi</div><small class="text-muted">Database dan profil klien Balai Pemasyarakatan</small></div></div></div><div class="col-md-6 col-xl-4"><div class="mod-card" onclick="sideBtn(SIDE_MENU[2].children[0]).click()"><div class="ic"><i class="bi bi-eye"></i></div><div><div class="fw-bold" style="color:#0E203C;">Pengawasan</div><small class="text-muted">Pelacakan lokasi dan presensi klien</small></div></div></div><div class="col-md-6 col-xl-4"><div class="mod-card" onclick="sideBtn(SIDE_MENU[3].children[0]).click()"><div class="ic"><i class="bi bi-clipboard2-pulse"></i></div><div><div class="fw-bold" style="color:#0E203C;">Asesmen Rehabilitasi dan Reedukasi</div><small class="text-muted">Input, kelola, dan cetak hasil asesmen warga binaan</small></div></div></div><div class="col-md-6 col-xl-4"><div class="mod-card" onclick="sideBtn(SIDE_MENU[4].children[0]).click()"><div class="ic"><i class="bi bi-journal-text"></i></div><div><div class="fw-bold" style="color:#0E203C;">Penelitian Kemasyarakatan (Litmas)</div><small class="text-muted">Laporan Litmas dengan riwayat perubahan dan ekstraksi AI</small></div></div></div>`;
     syncSidebar();
     loadFoto();
@@ -889,7 +889,16 @@
     });
   }
 
+  function applyMitraUI() {
+    document.querySelectorAll('#mainTabs > li').forEach(li => {
+      if (!['tabBerandaContainer', 'tabPelacakanContainer', 'tabProfilContainer'].includes(li.id)) li.classList.add('d-none');
+    });
+    document.getElementById('berandaCards').innerHTML = `<div class="col-md-6 col-xl-4"><div class="mod-card" onclick="sideBtn(SIDE_MENU[2].children[0]).click()"><div class="ic"><i class="bi bi-eye"></i></div><div><div class="fw-bold" style="color:#0E203C;">Pelacakan Klien</div><small class="text-muted">Pantau lokasi dan perkembangan klien di wilayah kewenangan Anda</small></div></div></div>`;
+    syncSidebar();
+  }
+
   function applyStrukturOrganisasiUI() {
+    if (userTingkat === 'MITRA') { applyMitraUI(); return; }
     document.getElementById('thUptAsesor').classList.toggle('d-none', userTingkat === 'UPT');
     document.getElementById('thKanwilAsesor').classList.toggle('d-none', userTingkat === 'UPT');
 
@@ -946,7 +955,7 @@
     document.getElementById('tabWilayahKerjaContainer').classList.toggle('d-none', !(userTingkat === 'UPT' && isPimpinanUI()));
     loadPenandatangan();
     loadLokasiAsesmen();
-    loadDataList();
+    if (userTingkat !== 'MITRA') loadDataList();
   }
 
   function logout() {
@@ -1592,7 +1601,7 @@
     document.getElementById('pfNama').innerText = asr || '-';
     document.getElementById('pfUsername').innerText = sessionUsername || '-';
     document.getElementById('pfJabatan').innerText = userJabatan || '-';
-    document.getElementById('pfTingkat').innerText = { UPT: 'UPT', KANWIL: 'Kanwil', DITJEN: 'Ditjenpas' }[userTingkat] || '-';
+    document.getElementById('pfTingkat').innerText = { UPT: 'UPT', KANWIL: 'Kanwil', DITJEN: 'Ditjenpas', MITRA: 'Mitra Bapas' }[userTingkat] || '-';
     ['pwLama', 'pwBaru', 'pwUlang', 'ttdFile'].forEach(id => document.getElementById(id).value = '');
     ttdDraft = null;
     fotoDraft = null;
@@ -2769,7 +2778,7 @@
       if (q && !`${u.username} ${u.nama} ${u.peran}`.toLowerCase().includes(q)) return false;
       if (tg && u.tingkat !== tg) return false;
       if (upt && u.upt_id !== upt) return false;
-      if (kw && (u.tingkat === 'UPT' ? uptKanwil[u.upt_id] : u.kanwil_id) !== kw) return false;
+      if (kw && (u.tingkat === 'UPT' || u.tingkat === 'MITRA' ? uptKanwil[u.upt_id] : u.kanwil_id) !== kw) return false;
       const sts = u.status_penandatangan || [];
       if (st === '__none') return sts.length === 0;
       if (st && !sts.includes(st)) return false;
@@ -2778,7 +2787,7 @@
     document.getElementById('fuCount').textContent = `Menampilkan ${users.length} dari ${allUsers.length} user`;
     if (users.length === 0) { tbody.innerHTML = `<tr><td colspan="7" class="text-center">${allUsers.length ? 'Tidak ada user yang cocok dengan filter.' : 'Belum ada data.'}</td></tr>`; return; }
     tbody.innerHTML = users.map(u => `<tr>
-        <td>${esc(u.username)}</td><td>${esc(u.nama)}</td><td>${esc(u.peran)}</td><td>${(u.status_penandatangan || []).map(x => `<span class="badge bg-info text-dark me-1">${STATUS_LABEL[x] || esc(x)}</span>`).join('') || '-'}</td><td>${esc(u.tingkat)}</td>
+        <td>${esc(u.username)}</td><td>${esc(u.nama)}</td><td>${esc(u.peran)}</td><td>${(u.status_penandatangan || []).map(x => `<span class="badge bg-info text-dark me-1">${STATUS_LABEL[x] || esc(x)}</span>`).join('') || '-'}</td><td>${esc(u.tingkat)}${u.tingkat === 'MITRA' ? '<br><small class="text-muted">' + esc([u.mitra_kel, u.mitra_kec, u.mitra_kota].filter(Boolean).join(', ')) + '</small>' : ''}</td>
         <td>${esc((u.upt && u.upt.nama) || (u.kanwil && u.kanwil.nama) || '-')}</td>
         <td>
           <button class="btn btn-sm btn-primary" onclick="openUserModal('${u.username}')">✏️ Edit</button>
@@ -2791,13 +2800,27 @@
     return uptCache.map(u => `<option value="${u.id}" ${u.id === selectedId ? 'selected' : ''}>${esc(u.nama)}</option>`).join('');
   }
 
-  function renderUnitFieldByTingkat(tingkat, uptId, kanwilId) {
-    if (userTingkat === 'UPT') return `<input type="hidden" id="am_upt_id" value="${esc(userUptId)}">`;
+  const MITRA_JENIS = ['Babinkamtibmas', 'Babinsa', 'Jaksa Pengawas', 'Kapolsek', 'Kapolres', 'Ketua Pengadilan Negeri'];
+  let daerahCache = [];
+  function mitraWilayahFields(u) {
+    const kota = (u && u.mitra_kota) || '';
+    const opts = daerahCache.includes(kota) || !kota ? daerahCache : [kota].concat(daerahCache);
+    return `<label class="form-label">Kota/Kabupaten wewenang</label>
+      <select id="am_mitra_kota" class="form-select mb-2"><option value="">-- pilih --</option>${opts.map(d => `<option value="${esc(d)}" ${d === kota ? 'selected' : ''}>${esc(d)}</option>`).join('')}</select>
+      <label class="form-label">Kecamatan <small class="text-muted">(opsional, mis. untuk Kapolsek/Babinkamtibmas)</small></label>
+      <input type="text" id="am_mitra_kec" class="form-control mb-2" value="${esc(u && u.mitra_kec)}">
+      <label class="form-label">Kelurahan/Desa <small class="text-muted">(opsional, mis. untuk Babinsa/Babinkamtibmas)</small></label>
+      <input type="text" id="am_mitra_kel" class="form-control mb-2" value="${esc(u && u.mitra_kel)}">
+      <div class="form-text mb-2">Mitra hanya dapat melihat klien yang alamatnya berada di wilayah ini.</div>`;
+  }
+
+  function renderUnitFieldByTingkat(tingkat, uptId, kanwilId, u) {
+    if (userTingkat === 'UPT') return `<input type="hidden" id="am_upt_id" value="${esc(userUptId)}">` + (tingkat === 'MITRA' ? mitraWilayahFields(u) : '');
     if (tingkat === 'KANWIL') {
       return `<label class="form-label">Kanwil</label><select id="am_kanwil_id" class="form-select mb-2" ${userTingkat === 'KANWIL' ? 'disabled' : ''}>${kanwilSelectOptions(kanwilId || userKanwilId)}</select>`;
     }
-    if (tingkat === 'UPT') {
-      return `<label class="form-label">UPT</label><select id="am_upt_id" class="form-select mb-2">${uptSelectOptions(uptId)}</select>`;
+    if (tingkat === 'UPT' || tingkat === 'MITRA') {
+      return `<label class="form-label">${tingkat === 'MITRA' ? 'Bapas pembina' : 'UPT'}</label><select id="am_upt_id" class="form-select mb-2">${uptSelectOptions(uptId)}</select>` + (tingkat === 'MITRA' ? mitraWilayahFields(u) : '');
     }
     return '';
   }
@@ -2806,10 +2829,11 @@
     adminModalMode = { type: 'user', id: username || null };
     document.getElementById('adminModalTitle').innerText = username ? 'Edit User' : 'Tambah User';
 
-    callApi("listUsers").then(r => {
+    Promise.all([callApi("listUsers"), callApi("listDaerahKlien")]).then(([r, dr]) => {
+      daerahCache = dr.success ? dr.data : [];
       let u = username && r.success ? (r.data || []).find(x => x.username === username) : null;
       let tingkatAwal = (u && u.tingkat) || 'UPT';
-      let tingkatOptions = userTingkat === 'UPT' ? ['UPT'] : ['UPT', 'KANWIL'].concat(userTingkat === 'DITJEN' ? ['DITJEN'] : []);
+      let tingkatOptions = userTingkat === 'UPT' ? ['UPT', 'MITRA'] : ['UPT', 'MITRA', 'KANWIL'].concat(userTingkat === 'DITJEN' ? ['DITJEN'] : []);
       document.getElementById('adminModalBody').innerHTML = `
         <label class="form-label">Username</label>
         <input type="text" id="am_username" class="form-control mb-2" value="${esc(username)}" ${username ? 'disabled' : ''}>
@@ -2818,14 +2842,15 @@
         <label class="form-label">Nama</label>
         <input type="text" id="am_nama" class="form-control mb-2" value="${esc(u && u.nama)}">
         <label class="form-label">Peran/Jabatan</label>
-        <input type="text" id="am_peran" class="form-control mb-2" value="${esc(u && u.peran)}">
+        <input type="text" id="am_peran" class="form-control mb-2" list="am_peran_list" value="${esc(u && u.peran)}">
+        <datalist id="am_peran_list">${MITRA_JENIS.map(j => `<option value="${j}">`).join('')}</datalist>
         <label class="form-label d-block">Status Penandatangan Asesmen</label>
         <div class="mb-2">${Object.entries(STATUS_LABEL).map(([k, v]) => `<div class="form-check form-check-inline"><input class="form-check-input am-status" type="checkbox" id="am_st_${k}" value="${k}" ${u && (u.status_penandatangan || []).includes(k) ? 'checked' : ''}><label class="form-check-label" for="am_st_${k}">${v}</label></div>`).join('')}</div>
         <label class="form-label">Tingkat</label>
-        <select id="am_tingkat" class="form-select mb-2" onchange="document.getElementById('am_unit_container').innerHTML = renderUnitFieldByTingkat(this.value, null, null)">
-          ${tingkatOptions.map(t => `<option value="${t}" ${tingkatAwal === t ? 'selected' : ''}>${t}</option>`).join('')}
+        <select id="am_tingkat" class="form-select mb-2" onchange="document.getElementById('am_unit_container').innerHTML = renderUnitFieldByTingkat(this.value, null, null, null)">
+          ${tingkatOptions.map(t => `<option value="${t}" ${tingkatAwal === t ? 'selected' : ''}>${t === 'MITRA' ? 'MITRA (Mitra Bapas)' : t}</option>`).join('')}
         </select>
-        <div id="am_unit_container">${renderUnitFieldByTingkat(tingkatAwal, u && u.upt_id, u && u.kanwil_id)}</div>`;
+        <div id="am_unit_container">${renderUnitFieldByTingkat(tingkatAwal, u && u.upt_id, u && u.kanwil_id, u)}</div>`;
       getAdminModal().show();
     });
   }
@@ -2892,9 +2917,14 @@
         peran: document.getElementById('am_peran').value,
         status_penandatangan: Array.from(document.querySelectorAll('.am-status:checked')).map(c => c.value),
         tingkat: tingkat,
-        upt_id: tingkat === 'UPT' ? (document.getElementById('am_upt_id') ? document.getElementById('am_upt_id').value : null) : null,
+        upt_id: (tingkat === 'UPT' || tingkat === 'MITRA') ? (document.getElementById('am_upt_id') ? document.getElementById('am_upt_id').value : null) : null,
         kanwil_id: tingkat === 'KANWIL' ? (document.getElementById('am_kanwil_id') ? document.getElementById('am_kanwil_id').value : null) : null,
       };
+      if (tingkat === 'MITRA') {
+        payload.mitra_kota = document.getElementById('am_mitra_kota').value;
+        payload.mitra_kec = document.getElementById('am_mitra_kec').value;
+        payload.mitra_kel = document.getElementById('am_mitra_kel').value;
+      }
       let password = document.getElementById('am_password').value;
       if (password) payload.password = password;
 

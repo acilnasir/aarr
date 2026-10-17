@@ -34,7 +34,7 @@ const CORS_HEADERS = {
 
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 jam
 
-type Tingkat = "UPT" | "KANWIL" | "DITJEN";
+type Tingkat = "UPT" | "KANWIL" | "DITJEN" | "MITRA";
 
 interface SessionPayload {
   username: string;
@@ -43,6 +43,9 @@ interface SessionPayload {
   tingkat: Tingkat;
   upt_id: string | null;
   kanwil_id: string | null;
+  mitra_kota?: string | null;
+  mitra_kec?: string | null;
+  mitra_kel?: string | null;
   exp: number; // epoch ms
 }
 
@@ -107,6 +110,12 @@ function unauthorized(message = "Sesi tidak valid, silakan login ulang.") {
   return { success: false, message, code: "UNAUTHORIZED" };
 }
 
+// Aksi yang boleh dipanggil user MITRA (baca-saja, dibatasi wilayah).
+const MITRA_ACTIONS = [
+  "listLokasiKlien", "getKlien", "listRiwayatPresensi", "getFotoPresensi",
+  "getMyPhoto", "saveMyPhoto", "changePassword", "getKunci",
+];
+
 function forbidden(message = "Anda tidak memiliki akses untuk aksi ini.") {
   return { success: false, message, code: "FORBIDDEN" };
 }
@@ -137,6 +146,10 @@ serve(async (req: Request) => {
     const session = await verifyToken(body.token);
     if (!session) {
       return json(unauthorized());
+    }
+
+    if (session.tingkat === "MITRA" && !MITRA_ACTIONS.includes(action)) {
+      return json(forbidden("Akun Mitra Bapas hanya dapat mengakses Pelacakan Klien."));
     }
 
     let result: Record<string, unknown>;
@@ -241,6 +254,10 @@ serve(async (req: Request) => {
         result = await updateDitjenProfile(session, body.payload);
         break;
 
+      case "listDaerahKlien":
+        result = await listDaerahKlien(session);
+        break;
+
       // --- Kelola User ---
       case "listUsers":
         result = await listUsers(session);
@@ -340,7 +357,7 @@ function nowJakartaTimestamp(): string {
 async function checkLogin(username: string, password: string) {
   const { data, error } = await supabase
     .from("users")
-    .select("username, password_hash, nama, peran, tingkat, upt_id, kanwil_id")
+    .select("username, password_hash, nama, peran, tingkat, upt_id, kanwil_id, mitra_kota, mitra_kec, mitra_kel")
     .eq("username", username)
     .maybeSingle();
 
@@ -360,6 +377,9 @@ async function checkLogin(username: string, password: string) {
     tingkat: (data.tingkat ?? "UPT") as Tingkat,
     upt_id: data.upt_id,
     kanwil_id: data.kanwil_id,
+    mitra_kota: data.mitra_kota,
+    mitra_kec: data.mitra_kec,
+    mitra_kel: data.mitra_kel,
     exp: Date.now() + SESSION_TTL_MS,
   };
   const token = await signToken(sessionPayload);
@@ -374,6 +394,9 @@ async function checkLogin(username: string, password: string) {
       tingkat: sessionPayload.tingkat,
       upt_id: data.upt_id,
       kanwil_id: data.kanwil_id,
+      mitra_kota: data.mitra_kota,
+      mitra_kec: data.mitra_kec,
+      mitra_kel: data.mitra_kel,
     },
   };
 }
@@ -558,6 +581,7 @@ async function scopedUptIds(session: SessionPayload): Promise<string[] | null> {
   // null berarti "tanpa filter" (DITJEN melihat semua).
   if (session.tingkat === "DITJEN") return null;
   if (session.tingkat === "UPT") return session.upt_id ? [session.upt_id] : [];
+  if (session.tingkat === "MITRA") return [];
 
   // KANWIL: seluruh UPT dalam provinsi (kanwil) miliknya.
   const { data, error } = await supabase
@@ -1286,10 +1310,25 @@ async function updateDitjenProfile(session: SessionPayload, payload: Record<stri
 // Kelola User -- DITJEN: semua user. KANWIL: user UPT di provinsinya + user
 // KANWIL lain di provinsi yang sama (tidak termasuk user DITJEN).
 // ---------------------------------------------------------------------------
+// Daftar kota/kabupaten (kolom daerah) yang ada pada data klien, untuk pilihan wilayah Mitra.
+async function listDaerahKlien(session: SessionPayload) {
+  if (session.tingkat === "UPT" && !isKepalaBapas(session)) return forbidden();
+  const { data, error } = await fetchSemua((from, to) =>
+    supabase.from("klien").select("daerah").not("daerah", "is", null).order("id").range(from, to)
+  );
+  if (error) return { success: false, message: error };
+  const set = new Set<string>();
+  for (const r of data ?? []) {
+    const d = String((r as Record<string, unknown>).daerah ?? "").trim();
+    if (d) set.add(d);
+  }
+  return { success: true, data: [...set].sort((a, b) => a.localeCompare(b)) };
+}
+
 async function listUsers(session: SessionPayload) {
   if (session.tingkat === "UPT" && !isKepalaBapas(session)) return forbidden();
 
-  const selectCols = "username, nama, peran, status_penandatangan, tingkat, upt_id, kanwil_id, upt:upt_id(nama), kanwil:kanwil_id(nama)";
+  const selectCols = "username, nama, peran, status_penandatangan, tingkat, upt_id, kanwil_id, mitra_kota, mitra_kec, mitra_kel, upt:upt_id(nama), kanwil:kanwil_id(nama)";
 
   if (session.tingkat === "UPT") {
     const { data, error } = await supabase.from("users").select(selectCols).eq("upt_id", session.upt_id).order("username");
@@ -1329,12 +1368,12 @@ async function canManageTargetUser(
   kanwil_id: string | null,
 ): Promise<boolean> {
   if (session.tingkat === "DITJEN") return true;
-  // Kepala Bapas: hanya user tingkat UPT pada UPT-nya sendiri.
-  if (isKepalaBapas(session)) return tingkat === "UPT" && !!upt_id && upt_id === session.upt_id;
+  // Kepala Bapas: hanya user UPT/MITRA pada UPT-nya sendiri.
+  if (isKepalaBapas(session)) return (tingkat === "UPT" || tingkat === "MITRA") && !!upt_id && upt_id === session.upt_id;
   if (session.tingkat !== "KANWIL") return false;
   if (tingkat === "DITJEN") return false;
   if (tingkat === "KANWIL") return kanwil_id === session.kanwil_id;
-  // tingkat === "UPT": UPT target harus berada di provinsi (kanwil) yang sama.
+  // tingkat === "UPT" atau "MITRA": UPT target harus berada di provinsi (kanwil) yang sama.
   if (!upt_id) return false;
   const { data } = await supabase.from("upt").select("kanwil_id").eq("id", upt_id).maybeSingle();
   return !!data && data.kanwil_id === session.kanwil_id;
@@ -1348,6 +1387,14 @@ function normalizeStatus(v: unknown): string[] | null {
   if (!Array.isArray(v)) return null;
   const out = [...new Set(v.map(String))];
   return out.every((x) => STATUS_PENANDATANGAN.includes(x)) ? out : null;
+}
+
+function cleanMitra(payload: Record<string, unknown>, uptId: string | null | undefined) {
+  const t = (v: unknown) => String(v ?? "").trim().slice(0, 100);
+  const mitra_kota = t(payload.mitra_kota);
+  if (!uptId) return { error: "Mitra Bapas wajib dikaitkan dengan satu Bapas pembina." };
+  if (!mitra_kota) return { error: "Kota/kabupaten wilayah kewenangan Mitra wajib diisi." };
+  return { mitra_kota, mitra_kec: t(payload.mitra_kec) || null, mitra_kel: t(payload.mitra_kel) || null };
 }
 
 async function createUser(session: SessionPayload, payload: Record<string, unknown>) {
@@ -1364,6 +1411,8 @@ async function createUser(session: SessionPayload, payload: Record<string, unkno
   if (!allowed) return forbidden("Anda tidak berwenang membuat user dengan lingkup ini.");
   const status = normalizeStatus(payload.status_penandatangan);
   if (status === null) return { success: false, message: "Status penandatangan tidak valid." };
+  const mitra = tingkat === "MITRA" ? cleanMitra(payload, upt_id) : null;
+  if (mitra && "error" in mitra) return { success: false, message: mitra.error };
 
   const { error } = await supabase.from("users").insert({
     username,
@@ -1371,9 +1420,12 @@ async function createUser(session: SessionPayload, payload: Record<string, unkno
     nama,
     peran: peran ?? "",
     tingkat,
-    upt_id: tingkat === "UPT" ? upt_id : null,
+    upt_id: tingkat === "UPT" || tingkat === "MITRA" ? upt_id : null,
     kanwil_id: tingkat === "KANWIL" ? kanwil_id : null,
     status_penandatangan: status,
+    mitra_kota: mitra ? mitra.mitra_kota : null,
+    mitra_kec: mitra ? mitra.mitra_kec : null,
+    mitra_kel: mitra ? mitra.mitra_kel : null,
   });
   if (error) return { success: false, message: "Gagal menambah user: " + error.message };
   return { success: true, message: "User berhasil ditambahkan." };
@@ -1398,14 +1450,20 @@ async function updateUser(session: SessionPayload, username: string, payload: Re
   };
 
   const newTingkat = tingkat ?? existing.tingkat;
-  const newUptId = newTingkat === "UPT" ? (upt_id ?? existing.upt_id) : null;
+  const newUptId = newTingkat === "UPT" || newTingkat === "MITRA" ? (upt_id ?? existing.upt_id) : null;
   const newKanwilId = newTingkat === "KANWIL" ? (kanwil_id ?? existing.kanwil_id) : null;
   const allowedNew = await canManageTargetUser(session, newTingkat, newUptId, newKanwilId);
   if (!allowedNew) return forbidden("Anda tidak berwenang memindahkan user ke lingkup tersebut.");
 
   const update: Record<string, unknown> = {
     nama, peran, tingkat: newTingkat, upt_id: newUptId, kanwil_id: newKanwilId,
+    mitra_kota: null, mitra_kec: null, mitra_kel: null,
   };
+  if (newTingkat === "MITRA") {
+    const mitra = cleanMitra(payload, newUptId);
+    if ("error" in mitra) return { success: false, message: mitra.error };
+    Object.assign(update, mitra);
+  }
   if (password) update.password_hash = hashSync(password);
   if (payload.status_penandatangan !== undefined) {
     const status = normalizeStatus(payload.status_penandatangan);
@@ -1456,9 +1514,18 @@ function canManageKlien(session: SessionPayload): boolean {
   return session.tingkat === "UPT" && !!session.upt_id;
 }
 
+const normWilayah = (v: unknown) => String(v ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+function klienDalamWilayahMitra(session: SessionPayload, k: { daerah?: unknown; alamat?: unknown }): boolean {
+  if (!session.mitra_kota || normWilayah(k.daerah) !== normWilayah(session.mitra_kota)) return false;
+  const alamat = normWilayah(k.alamat);
+  if (session.mitra_kec && !alamat.includes(normWilayah(session.mitra_kec))) return false;
+  if (session.mitra_kel && !alamat.includes(normWilayah(session.mitra_kel))) return false;
+  return true;
+}
 async function klienInScope(session: SessionPayload, id: string) {
-  const { data } = await supabase.from("klien").select("id, upt_id").eq("id", id).maybeSingle();
+  const { data } = await supabase.from("klien").select("id, upt_id, daerah, alamat").eq("id", id).maybeSingle();
   if (!data) return null;
+  if (session.tingkat === "MITRA") return klienDalamWilayahMitra(session, data) ? data : null;
   const uptIds = await scopedUptIds(session);
   if (uptIds !== null && !uptIds.includes(data.upt_id as string)) return null;
   return data;
@@ -1508,6 +1575,11 @@ async function listKlien(session: SessionPayload) {
   return { success: true, data, can_manage: canManageKlien(session) };
 }
 
+// Data klien yang boleh dilihat Mitra Bapas (tanpa NIK, penjamin, dsb).
+const MITRA_KLIEN_FIELDS = [
+  "id", "no_register", "nama", "no_hp", "alamat", "daerah", "perkara", "pasal", "pk", "lama_pidana",
+  "jenis_kelamin", "tanggal_penerimaan", "tanggal_ekspirasi", "status_pembimbingan", "foto",
+];
 async function getKlien(session: SessionPayload, id: string) {
   if (!(await klienInScope(session, id))) return forbidden("Data klien tidak ditemukan.");
   const { data, error } = await supabase
@@ -1516,6 +1588,12 @@ async function getKlien(session: SessionPayload, id: string) {
     .eq("id", id)
     .maybeSingle();
   if (error || !data) return { success: false, message: error?.message ?? "Data klien tidak ditemukan." };
+  if (session.tingkat === "MITRA") {
+    const d = data as Record<string, unknown>;
+    const ringkas: Record<string, unknown> = {};
+    for (const f of MITRA_KLIEN_FIELDS) ringkas[f] = d[f];
+    return { success: true, data: ringkas, can_manage: false };
+  }
   return { success: true, data, can_manage: canManageKlien(session) };
 }
 
@@ -1654,19 +1732,24 @@ async function publicPresensi(body: Record<string, unknown>) {
 }
 
 async function listLokasiKlien(session: SessionPayload) {
+  const mitra = session.tingkat === "MITRA";
   const uptIds = await scopedUptIds(session);
-  if (uptIds !== null && uptIds.length === 0) return { success: true, data: [], can_manage: false };
+  if (mitra && !session.mitra_kota) return { success: true, data: [], can_manage: false };
+  if (!mitra && uptIds !== null && uptIds.length === 0) return { success: true, data: [], can_manage: false };
   const { data: klien, error } = await fetchSemua((from, to) => {
     let q = supabase
       .from("klien")
       .select("id, upt_id, no_register, nama, no_hp, alamat, daerah, lat, lng, wilayah_izin, lat_pusat, long_pusat, radius_km, pk, perkara, upt:upt_id(nama, kanwil:kanwil_id(provinsi))")
       .order("nama")
       .order("id");
-    if (uptIds !== null) q = q.in("upt_id", uptIds);
+    if (mitra) {
+      q = q.ilike("daerah", String(session.mitra_kota).replace(/[%,()]/g, " "));
+    } else if (uptIds !== null) q = q.in("upt_id", uptIds);
     return q.range(from, to);
   });
   if (error) return { success: false, message: error };
-  const ids = (klien ?? []).map((k: Record<string, unknown>) => k.id as string);
+  const klienData = mitra ? (klien ?? []).filter((k: Record<string, unknown>) => klienDalamWilayahMitra(session, k)) : (klien ?? []);
+  const ids = klienData.map((k: Record<string, unknown>) => k.id as string);
   const terbaru: Record<string, Record<string, unknown>> = {};
   for (let i = 0; i < ids.length; i += 100) {
     const { data: pres } = await supabase
@@ -1677,7 +1760,7 @@ async function listLokasiKlien(session: SessionPayload) {
       .limit(5000);
     for (const p of pres ?? []) if (!terbaru[p.klien_id as string]) terbaru[p.klien_id as string] = p;
   }
-  const data = (klien ?? []).map((k: Record<string, unknown>) => ({ ...k, terakhir: terbaru[k.id as string] ?? null }));
+  const data = klienData.map((k: Record<string, unknown>) => ({ ...k, terakhir: terbaru[k.id as string] ?? null }));
   return { success: true, data, can_manage: canManageKlien(session) };
 }
 
