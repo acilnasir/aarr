@@ -12,6 +12,15 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <style>
+    .plc { background: transparent; }
+    .plc div { width: 100%; height: 100%; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #111; border: 2px solid rgba(255,255,255,.9); }
+    .plc-1 div { background: #3b82f6; color: #fff; box-shadow: 0 0 0 6px rgba(59,130,246,.30), 0 0 0 14px rgba(59,130,246,.15); }
+    .plc-2 div { background: #fbbf24; box-shadow: 0 0 0 6px rgba(251,191,36,.35), 0 0 0 14px rgba(251,191,36,.18); }
+    .plc-3 div { background: #fb923c; box-shadow: 0 0 0 6px rgba(251,146,60,.35), 0 0 0 14px rgba(251,146,60,.18); }
+    .plc-4 div { background: #ef4444; color: #fff; box-shadow: 0 0 0 6px rgba(239,68,68,.35), 0 0 0 14px rgba(239,68,68,.18); }
+  </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
@@ -122,6 +131,14 @@
           <div class="col-md-6"><label class="form-label">Pasal Pelanggaran</label><input id="kf_pasal" class="form-control"></div>
           <div class="col-md-6"><label class="form-label">Lama Pidana</label><input id="kf_lama_pidana" class="form-control" placeholder="mis. 2 tahun 6 bulan"></div>
           <div class="col-md-6"><label class="form-label">Asal Instansi</label><input id="kf_asal_instansi" class="form-control" placeholder="mis. Lapas Kelas IIA ..."></div>
+          <div class="col-md-4"><label class="form-label">Jenis Kelamin</label><select id="kf_jenis_kelamin" class="form-select"><option value="">-</option><option>LAKI-LAKI</option><option>PEREMPUAN</option></select></div>
+          <div class="col-md-4"><label class="form-label">Anak/Dewasa</label><select id="kf_kategori" class="form-select"><option value="">-</option><option>DEWASA</option><option>ANAK</option></select></div>
+          <div class="col-md-4"><label class="form-label">Jenis Integrasi</label><input id="kf_jenis_integrasi" class="form-control" placeholder="PB / CB / CMB ..."></div>
+          <div class="col-md-4"><label class="form-label">PK Pembimbing</label><input id="kf_pk" class="form-control"></div>
+          <div class="col-md-4"><label class="form-label">Tanggal Penerimaan</label><input id="kf_tanggal_penerimaan" type="date" class="form-control"></div>
+          <div class="col-md-4"><label class="form-label">Tanggal Ekspirasi</label><input id="kf_tanggal_ekspirasi" type="date" class="form-control"></div>
+          <div class="col-md-6"><label class="form-label">Status</label><select id="kf_status_pembimbingan" class="form-select"><option value="">-</option><option>AKTIF</option><option>PENGAKHIRAN</option></select></div>
+          <div class="col-md-6"><label class="form-label">Daerah</label><input id="kf_daerah" class="form-control" placeholder="mis. Kab. Banyumas"></div>
         </div>
       </div>
       <div class="modal-footer">
@@ -562,13 +579,17 @@
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
         <h5 class="m-0">Pelacakan Klien <small class="text-muted fs-6" id="plCount"></small></h5>
         <div class="d-flex gap-2">
+          <select id="plMode" class="form-select form-select-sm w-auto" onchange="ubahModePelacakan()" title="Sumber lokasi klien">
+            <option value="alamat">Koordinat alamat registrasi</option>
+            <option value="lapor">Lokasi terakhir melapor</option>
+          </select>
           <button class="btn btn-sm btn-outline-primary" onclick="salinLinkPresensi()"><i class="bi bi-link-45deg"></i> Salin tautan presensi klien</button>
           <button class="btn btn-sm btn-outline-secondary" onclick="loadPelacakan()"><i class="bi bi-arrow-clockwise"></i> Muat ulang</button>
         </div>
       </div>
       <div class="row g-3">
         <div class="col-lg-8"><div id="plMap" style="height:440px;border-radius:8px;border:1px solid #dee2e6;"></div>
-          <div class="small text-muted mt-1"><span class="text-success">●</span> Dalam wilayah izin &nbsp; <span class="text-danger">●</span> Di luar wilayah &nbsp; <span class="text-primary">●</span> Tanpa batas wilayah &nbsp; <span class="text-secondary">●</span> Belum presensi (tidak tampil di peta)</div></div>
+          <div class="small text-muted mt-1"><span class="text-success">●</span> Dalam wilayah izin &nbsp; <span class="text-danger">●</span> Di luar wilayah &nbsp; <span class="text-primary">●</span> Tanpa batas wilayah &nbsp; <span class="text-secondary">●</span> Belum presensi (tidak tampil di peta) &nbsp; <span style="color:#fd7e14">●</span> Alamat registrasi<br>Warna kelompok (jumlah klien): <span style="color:#3b82f6">●</span> 1–9 &nbsp; <span style="color:#fbbf24">●</span> 10–49 &nbsp; <span style="color:#fb923c">●</span> 50–99 &nbsp; <span style="color:#ef4444">●</span> ≥100. Perbesar peta untuk melihat titik sebenarnya.</div></div>
         <div class="col-lg-4">
           <input type="search" id="plSearch" class="form-control form-control-sm mb-2" placeholder="Cari nama / no register..." oninput="renderPelacakanList()">
           <div id="plList" class="list-group" style="max-height:440px;overflow:auto;"></div>
@@ -1615,8 +1636,8 @@
 
 
   // ===== MODUL REGISTRASI: KLIEN =====
-  const KL_FIELDS = ['no_register','nik','nama','tanggal_lahir','agama','kewarganegaraan','pendidikan_terakhir','pekerjaan','status_pernikahan','alamat','no_hp','nama_penjamin','no_hp_penjamin','perkara','pasal','lama_pidana','asal_instansi'];
-  const KL_LABEL = { no_register:'No Register Klien', nik:'NIK', nama:'Nama Lengkap', tanggal_lahir:'Tanggal Lahir', agama:'Agama', kewarganegaraan:'Kewarganegaraan', pendidikan_terakhir:'Pendidikan Terakhir', pekerjaan:'Pekerjaan', status_pernikahan:'Status Pernikahan', alamat:'Alamat', no_hp:'No HP', nama_penjamin:'Nama Penjamin', no_hp_penjamin:'No HP Penjamin', perkara:'Perkara Tindak Pidana', pasal:'Pasal Pelanggaran', lama_pidana:'Lama Pidana', asal_instansi:'Asal Instansi' };
+  const KL_FIELDS = ['no_register','nik','nama','tanggal_lahir','agama','kewarganegaraan','pendidikan_terakhir','pekerjaan','status_pernikahan','alamat','no_hp','nama_penjamin','no_hp_penjamin','perkara','pasal','lama_pidana','asal_instansi','jenis_kelamin','pk','jenis_integrasi','kategori','tanggal_penerimaan','tanggal_ekspirasi','status_pembimbingan','daerah'];
+  const KL_LABEL = { no_register:'No Register Klien', nik:'NIK', nama:'Nama Lengkap', tanggal_lahir:'Tanggal Lahir', agama:'Agama', kewarganegaraan:'Kewarganegaraan', pendidikan_terakhir:'Pendidikan Terakhir', pekerjaan:'Pekerjaan', status_pernikahan:'Status Pernikahan', alamat:'Alamat', no_hp:'No HP', nama_penjamin:'Nama Penjamin', no_hp_penjamin:'No HP Penjamin', perkara:'Perkara Tindak Pidana', pasal:'Pasal Pelanggaran', lama_pidana:'Lama Pidana', asal_instansi:'Asal Instansi', jenis_kelamin:'Jenis Kelamin', pk:'PK Pembimbing', jenis_integrasi:'Jenis Integrasi', kategori:'Anak/Dewasa', tanggal_penerimaan:'Tanggal Penerimaan', tanggal_ekspirasi:'Tanggal Ekspirasi', status_pembimbingan:'Status', daerah:'Daerah' };
   let allKlien = [], klCanManage = false, kfFoto = undefined, klCurrentId = null;
   const KL_FOTO_DEFAULT = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 120"><rect width="90" height="120" fill="#ced4da"/><circle cx="45" cy="45" r="20" fill="#fff"/><path d="M10 120c0-26 15-40 35-40s35 14 35 40z" fill="#fff"/></svg>');
   const fmtTgl = t => t ? new Date(t + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-';
@@ -1751,12 +1772,13 @@
           ${sec('Data Pribadi', row('NIK', k.nik) + row('Tanggal Lahir', k.tanggal_lahir ? fmtTgl(k.tanggal_lahir) : '') + row('Agama', k.agama) + row('Kewarganegaraan', k.kewarganegaraan) + row('Pendidikan Terakhir', k.pendidikan_terakhir) + row('Pekerjaan', k.pekerjaan) + row('Status Pernikahan', k.status_pernikahan))}
           ${sec('Kontak', row('Alamat', k.alamat) + row('No HP', k.no_hp) + row('Nama Penjamin', k.nama_penjamin) + row('No HP Penjamin', k.no_hp_penjamin))}
           ${sec('Perkara', row('Perkara Tindak Pidana', k.perkara) + row('Pasal Pelanggaran', k.pasal) + row('Lama Pidana', k.lama_pidana) + row('Asal Instansi', k.asal_instansi) + row('UPT', k.upt ? k.upt.nama : ''))}
+          ${sec('Pembimbingan', row('Jenis Kelamin', k.jenis_kelamin) + row('Anak/Dewasa', k.kategori) + row('PK Pembimbing', k.pk) + row('Jenis Integrasi', k.jenis_integrasi) + row('Tanggal Penerimaan', k.tanggal_penerimaan ? fmtTgl(k.tanggal_penerimaan) : '') + row('Tanggal Ekspirasi', k.tanggal_ekspirasi ? fmtTgl(k.tanggal_ekspirasi) : '') + row('Status', k.status_pembimbingan) + row('Daerah', k.daerah))}
         </div></div></div></div>`;
     });
   }
 
   // ---------------- PENGAWASAN: PELACAKAN KLIEN ----------------
-  let plMap = null, plLayer = null, plData = [], plSel = null, plCanManage = false;
+  let plMap = null, plLayer = null, plData = [], plSel = null, plCanManage = false, plAlamatMarker = null, plCluster = null;
 
   function hitungJarakKm(a, b, c, d) {
     const R = 6371, rad = x => x * Math.PI / 180, dLa = rad(c - a), dLo = rad(d - b);
@@ -1773,6 +1795,62 @@
   const PL_LABEL = { dalam: 'Dalam wilayah izin', luar: 'DI LUAR wilayah izin', bebas: 'Tanpa batas wilayah', belum: 'Belum presensi' };
   const fmtWaktuPl = t => t ? new Date(t).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
 
+  // Geocoding alamat registrasi (OpenStreetMap Nominatim), di-cache di browser.
+  const plGeoCache = (() => { try { return JSON.parse(localStorage.getItem('plGeo') || '{}'); } catch (e) { return {}; } })();
+  let plGeoLast = 0;
+  async function geocodeAlamat(k) {
+    const dasar = String(k.alamat || '').replace(/\s+/g, ' ').trim();
+    if (!dasar) return null;
+    const key = k.id + '|' + dasar + '|' + (k.daerah || '');
+    if (key in plGeoCache) return plGeoCache[key];
+    const bagian = dasar.split(/[,;]/).map(x => x.trim()).filter(Boolean);
+    const upt = k.upt && k.upt.nama ? k.upt.nama.replace(/^Bapas\s+(Kelas\s+\w+\s+)?/i, '') : '';
+    const kandidat = [];
+    for (let i = 0; i < bagian.length && i < 4; i++) {
+      const q = bagian.slice(i).join(', ');
+      kandidat.push(q + (k.daerah ? ', ' + k.daerah : '') + ', Indonesia');
+      if (upt) kandidat.push(q + ', ' + upt + ', Indonesia');
+    }
+    kandidat.push(dasar + ', Indonesia');
+    let hasil = null;
+    for (const q of [...new Set(kandidat)]) {
+      const tunggu = 1100 - (Date.now() - plGeoLast);
+      if (tunggu > 0) await new Promise(r => setTimeout(r, tunggu));
+      plGeoLast = Date.now();
+      try {
+        const r = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=id&q=' + encodeURIComponent(q));
+        const j = await r.json();
+        if (j && j[0]) { hasil = { lat: parseFloat(j[0].lat), lng: parseFloat(j[0].lon), q }; break; }
+      } catch (e) { return undefined; }
+    }
+    plGeoCache[key] = hasil;
+    try { localStorage.setItem('plGeo', JSON.stringify(plGeoCache)); } catch (e) {}
+    return hasil;
+  }
+
+  function plModeAlamat() { return document.getElementById('plMode').value === 'alamat'; }
+
+  function ubahModePelacakan() {
+    if (plAlamatMarker) { plAlamatMarker.remove(); plAlamatMarker = null; }
+    renderPelacakan(!plModeAlamat());
+    if (plSel) bukaDetailPelacakan(plSel, true);
+  }
+
+  async function tampilAlamatDiPeta(k) {
+    const info = document.getElementById('plAlamatInfo');
+    if (info) info.innerHTML = '<span class="text-muted">Mencari koordinat alamat...</span>';
+    const g = k.lat != null ? { lat: k.lat, lng: k.lng, q: 'titik desa/kelurahan atau kecamatan sesuai alamat', tersimpan: true } : await geocodeAlamat(k);
+    if (plSel !== k.id) return;
+    if (plAlamatMarker) { plAlamatMarker.remove(); plAlamatMarker = null; }
+    const el = document.getElementById('plAlamatInfo');
+    if (g === undefined) { if (el) el.innerHTML = '<span class="text-danger">Layanan peta tidak dapat dihubungi.</span>'; return; }
+    if (!g) { if (el) el.innerHTML = '<span class="text-danger">Koordinat alamat tidak ditemukan. Lengkapi alamat di data registrasi klien.</span>'; return; }
+    plAlamatMarker = L.circleMarker([g.lat, g.lng], { radius: 10, color: '#fff', weight: 2, fillColor: '#fd7e14', fillOpacity: 1 })
+      .bindTooltip(escHtml(k.nama) + ' (alamat registrasi)').addTo(plMap);
+    plMap.setView([g.lat, g.lng], g.tersimpan ? 14 : 15);
+    if (el) el.innerHTML = `${g.lat.toFixed(6)}, ${g.lng.toFixed(6)} <a target="_blank" rel="noopener" href="https://www.google.com/maps?q=${g.lat},${g.lng}">Buka di Google Maps</a><br><small class="text-muted">Perkiraan dari alamat (hasil pencarian: ${escHtml(g.q)})</small>`;
+  }
+
   function salinLinkPresensi() {
     const url = new URL('presensi.html', location.href).href;
     (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(() => alert('Tautan disalin:\n' + url), () => prompt('Salin tautan presensi klien:', url));
@@ -1783,6 +1861,13 @@
       plMap = L.map('plMap').setView([-2.5, 118], 5);
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(plMap);
       plLayer = L.layerGroup().addTo(plMap);
+      plCluster = L.markerClusterGroup({
+        maxClusterRadius: 60, showCoverageOnHover: false, spiderfyOnMaxZoom: true,
+        iconCreateFunction: c => {
+          const n = c.getChildCount(), lv = n < 10 ? 1 : n < 50 ? 2 : n < 100 ? 3 : 4, sz = n < 10 ? 34 : n < 100 ? 42 : 52;
+          return L.divIcon({ html: '<div>' + n + '</div>', className: 'plc plc-' + lv, iconSize: [sz, sz] });
+        }
+      }).addTo(plMap);
     }
     setTimeout(() => plMap.invalidateSize(), 250);
     return callApi('listLokasiKlien').then(r => {
@@ -1795,17 +1880,26 @@
 
   function renderPelacakan(fit) {
     plLayer.clearLayers();
-    const pts = [];
+    plCluster.clearLayers();
+    const alamat = plModeAlamat(), pts = [], marks = [];
     plData.forEach(k => {
       const t = k.terakhir, st = plStatus(k, t);
+      if (alamat) {
+        if (k.lat == null || k.lng == null) return;
+        pts.push([k.lat, k.lng]);
+        marks.push(L.circleMarker([k.lat, k.lng], { radius: 8, color: '#fff', weight: 2, fillColor: '#fd7e14', fillOpacity: 1 })
+          .bindTooltip(`${escHtml(k.nama)} (${escHtml(k.no_register)})<br><small>${escHtml(k.alamat || '')}</small>`).on('click', () => bukaDetailPelacakan(k.id, false)));
+        return;
+      }
       if (k.lat_pusat != null && k.long_pusat != null && k.radius_km) {
         L.circle([k.lat_pusat, k.long_pusat], { radius: k.radius_km * 1000, color: PL_WARNA[st === 'belum' ? 'bebas' : st], weight: 1, fillOpacity: 0.05, interactive: false }).addTo(plLayer);
       }
       if (!t) return;
       pts.push([t.latitude, t.longitude]);
-      L.circleMarker([t.latitude, t.longitude], { radius: 9, color: '#fff', weight: 2, fillColor: PL_WARNA[st], fillOpacity: 1 })
-        .bindTooltip(`${escHtml(k.nama)} (${escHtml(k.no_register)})`).on('click', () => bukaDetailPelacakan(k.id, true)).addTo(plLayer);
+      marks.push(L.circleMarker([t.latitude, t.longitude], { radius: 9, color: '#fff', weight: 2, fillColor: PL_WARNA[st], fillOpacity: 1 })
+        .bindTooltip(`${escHtml(k.nama)} (${escHtml(k.no_register)})`).on('click', () => bukaDetailPelacakan(k.id, true)));
     });
+    plCluster.addLayers(marks);
     if (fit && pts.length) plMap.fitBounds(pts, { padding: [40, 40], maxZoom: 15 });
     renderPelacakanList();
   }
@@ -1815,13 +1909,13 @@
     const rows = plData.filter(k => !q || (k.nama + ' ' + k.no_register).toLowerCase().includes(q));
     const urut = { luar: 0, dalam: 1, bebas: 2, belum: 3 };
     rows.sort((a, b) => urut[plStatus(a, a.terakhir)] - urut[plStatus(b, b.terakhir)] || a.nama.localeCompare(b.nama));
-    document.getElementById('plCount').innerText = `(${plData.filter(k => k.terakhir).length} dari ${plData.length} klien sudah presensi)`;
-    document.getElementById('plList').innerHTML = rows.length ? rows.map(k => {
+    document.getElementById('plCount').innerText = plModeAlamat() ? `(${plData.filter(k => k.lat != null).length} dari ${plData.length} klien memiliki koordinat alamat)` : `(${plData.filter(k => k.terakhir).length} dari ${plData.length} klien sudah presensi)`;
+    document.getElementById('plList').innerHTML = rows.length ? rows.slice(0, 200).map(k => {
       const st = plStatus(k, k.terakhir);
       return `<button type="button" class="list-group-item list-group-item-action ${k.id === plSel ? 'active' : ''}" onclick="bukaDetailPelacakan('${k.id}', true)">
         <div class="d-flex justify-content-between"><span class="fw-semibold">${escHtml(k.nama)}</span><span style="color:${k.id === plSel ? '#fff' : PL_WARNA[st]}">●</span></div>
         <small>${escHtml(k.no_register)} · ${k.terakhir ? fmtWaktuPl(k.terakhir.waktu) : 'belum presensi'}</small></button>`;
-    }).join('') : '<div class="text-muted p-2">Belum ada klien.</div>';
+    }).join('') + (rows.length > 200 ? `<div class="text-muted small p-2">Menampilkan 200 dari ${rows.length} klien. Gunakan pencarian.</div>` : '') : '<div class="text-muted p-2">Belum ada klien.</div>';
   }
 
   function bukaDetailPelacakan(id, fokus) {
@@ -1830,7 +1924,7 @@
     if (!k) return;
     renderPelacakanList();
     const t = k.terakhir, st = plStatus(k, t);
-    if (fokus && t) plMap.setView([t.latitude, t.longitude], Math.max(plMap.getZoom(), 15));
+    if (fokus && t && !plModeAlamat()) plMap.setView([t.latitude, t.longitude], Math.max(plMap.getZoom(), 15));
     const box = document.getElementById('plDetail');
     const jarak = t && st !== 'bebas' && st !== 'belum' ? hitungJarakKm(k.lat_pusat, k.long_pusat, t.latitude, t.longitude).toFixed(2) + ' km dari titik pusat' : '';
     box.innerHTML = `<div class="card"><div class="card-body">
@@ -1848,6 +1942,7 @@
             <tr><th class="text-muted">Pekerjaan</th><td>${escHtml(t.pekerjaan || '-')}</td></tr>
             <tr><th class="text-muted">Alamat domisili</th><td>${escHtml(t.alamat_domisili || '-')}</td></tr>
             <tr><th class="text-muted">Kendala</th><td>${escHtml(t.kendala || '-')}</td></tr></tbody></table>` : ''}
+          <div class="small mb-1"><b>Alamat registrasi:</b> ${escHtml(k.alamat || '-')}<div id="plAlamatInfo" class="mt-1">${plModeAlamat() ? '' : `<button class="btn btn-sm btn-outline-warning py-0" onclick="document.getElementById('plMode').value='alamat';ubahModePelacakan()"><i class="bi bi-geo-alt"></i> Lihat koordinat alamat</button>`}</div></div>
           <div class="small"><b>Wilayah izin:</b> ${escHtml(k.wilayah_izin || '-')}${k.radius_km ? ` (pusat ${k.lat_pusat}, ${k.long_pusat}; radius ${k.radius_km} km)` : ' (belum ada batas radius)'}
             ${plCanManage ? ` <button class="btn btn-sm btn-outline-secondary py-0" onclick="aturWilayahKlien('${k.id}')"><i class="bi bi-pencil"></i> Atur</button>` : ''}</div>
         </div>
@@ -1868,6 +1963,7 @@
         return `<tr><td class="text-nowrap">${fmtWaktuPl(p.waktu)}</td><td><a target="_blank" rel="noopener" href="https://www.google.com/maps?q=${p.latitude},${p.longitude}">${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}</a></td><td>${escHtml(p.pekerjaan || '-')}</td><td>${escHtml(p.kendala || '-')}</td><td><span style="color:${PL_WARNA[s2]}">●</span> ${PL_LABEL[s2]}</td></tr>`;
       }).join('')}</tbody></table>` : 'Belum ada riwayat.';
     });
+    if (plModeAlamat()) tampilAlamatDiPeta(k);
     box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 

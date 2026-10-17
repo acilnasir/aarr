@@ -1446,6 +1446,8 @@ const KLIEN_FIELDS = [
   "no_register", "nik", "nama", "tanggal_lahir", "agama", "kewarganegaraan",
   "pendidikan_terakhir", "pekerjaan", "status_pernikahan", "alamat", "no_hp",
   "nama_penjamin", "no_hp_penjamin", "perkara", "pasal", "lama_pidana", "asal_instansi",
+  "jenis_kelamin", "pk", "jenis_integrasi", "kategori", "tanggal_penerimaan", "tanggal_ekspirasi",
+  "status_pembimbingan", "daerah",
 ] as const;
 const KLIEN_LIST_COLS = "id, upt_id, " + KLIEN_FIELDS.join(", ") + ", upt:upt_id(nama)";
 const MAX_KLIEN_FOTO_LENGTH = 200_000;
@@ -1477,6 +1479,9 @@ function cleanKlien(payload: Record<string, unknown>, partialFoto: boolean) {
   if (rec.tanggal_lahir && !/^\d{4}-\d{2}-\d{2}$/.test(rec.tanggal_lahir as string)) {
     return { error: "Format tanggal lahir tidak valid." };
   }
+  for (const f of ["tanggal_penerimaan", "tanggal_ekspirasi"]) {
+    if (rec[f] && !/^\d{4}-\d{2}-\d{2}$/.test(rec[f] as string)) return { error: `Format ${f} tidak valid.` };
+  }
   const foto = payload?.foto;
   if (foto !== undefined) {
     if (foto === null || foto === "") rec.foto = null;
@@ -1494,10 +1499,12 @@ function cleanKlien(payload: Record<string, unknown>, partialFoto: boolean) {
 async function listKlien(session: SessionPayload) {
   const uptIds = await scopedUptIds(session);
   if (uptIds !== null && uptIds.length === 0) return { success: true, data: [], can_manage: false };
-  let q = supabase.from("klien").select(KLIEN_LIST_COLS).order("nama");
-  if (uptIds !== null) q = q.in("upt_id", uptIds);
-  const { data, error } = await q;
-  if (error) return { success: false, message: error.message };
+  const { data, error } = await fetchSemua((from, to) => {
+    let q = supabase.from("klien").select(KLIEN_LIST_COLS).order("nama").order("id");
+    if (uptIds !== null) q = q.in("upt_id", uptIds);
+    return q.range(from, to);
+  });
+  if (error) return { success: false, message: error };
   return { success: true, data, can_manage: canManageKlien(session) };
 }
 
@@ -1561,6 +1568,21 @@ async function deleteKlien(session: SessionPayload, id: string) {
 // ---------------------------------------------------------------------------
 const MAX_PRESENSI_FOTO_LENGTH = 400_000;
 const PRESENSI_COLS = "id, klien_id, waktu, latitude, longitude, baterai, pekerjaan, alamat_domisili, kendala";
+
+// PostgREST membatasi 1000 baris per permintaan; ambil semua halaman.
+// deno-lint-ignore no-explicit-any
+async function fetchSemua(build: (from: number, to: number) => PromiseLike<{ data: any; error: { message: string } | null }>) {
+  const PAGE = 1000;
+  // deno-lint-ignore no-explicit-any
+  const all: any[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await build(from, from + PAGE - 1);
+    if (error) return { data: null, error: error.message };
+    all.push(...(data ?? []));
+    if (!data || data.length < PAGE) break;
+  }
+  return { data: all, error: null as string | null };
+}
 
 function escLike(v: string) {
   return v.replace(/[\\%_]/g, (c) => "\\" + c);
@@ -1634,20 +1656,23 @@ async function publicPresensi(body: Record<string, unknown>) {
 async function listLokasiKlien(session: SessionPayload) {
   const uptIds = await scopedUptIds(session);
   if (uptIds !== null && uptIds.length === 0) return { success: true, data: [], can_manage: false };
-  let q = supabase
-    .from("klien")
-    .select("id, upt_id, no_register, nama, no_hp, wilayah_izin, lat_pusat, long_pusat, radius_km, upt:upt_id(nama)")
-    .order("nama");
-  if (uptIds !== null) q = q.in("upt_id", uptIds);
-  const { data: klien, error } = await q;
-  if (error) return { success: false, message: error.message };
+  const { data: klien, error } = await fetchSemua((from, to) => {
+    let q = supabase
+      .from("klien")
+      .select("id, upt_id, no_register, nama, no_hp, alamat, daerah, lat, lng, wilayah_izin, lat_pusat, long_pusat, radius_km, upt:upt_id(nama)")
+      .order("nama")
+      .order("id");
+    if (uptIds !== null) q = q.in("upt_id", uptIds);
+    return q.range(from, to);
+  });
+  if (error) return { success: false, message: error };
   const ids = (klien ?? []).map((k: Record<string, unknown>) => k.id as string);
   const terbaru: Record<string, Record<string, unknown>> = {};
-  for (let i = 0; i < ids.length; i += 200) {
+  for (let i = 0; i < ids.length; i += 100) {
     const { data: pres } = await supabase
       .from("presensi_klien")
       .select(PRESENSI_COLS)
-      .in("klien_id", ids.slice(i, i + 200))
+      .in("klien_id", ids.slice(i, i + 100))
       .order("waktu", { ascending: false })
       .limit(5000);
     for (const p of pres ?? []) if (!terbaru[p.klien_id as string]) terbaru[p.klien_id as string] = p;
