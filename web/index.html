@@ -122,6 +122,14 @@
           <div class="col-md-6"><label class="form-label">Pasal Pelanggaran</label><input id="kf_pasal" class="form-control"></div>
           <div class="col-md-6"><label class="form-label">Lama Pidana</label><input id="kf_lama_pidana" class="form-control" placeholder="mis. 2 tahun 6 bulan"></div>
           <div class="col-md-6"><label class="form-label">Asal Instansi</label><input id="kf_asal_instansi" class="form-control" placeholder="mis. Lapas Kelas IIA ..."></div>
+          <div class="col-md-4"><label class="form-label">Jenis Kelamin</label><select id="kf_jenis_kelamin" class="form-select"><option value="">-</option><option>LAKI-LAKI</option><option>PEREMPUAN</option></select></div>
+          <div class="col-md-4"><label class="form-label">Anak/Dewasa</label><select id="kf_kategori" class="form-select"><option value="">-</option><option>DEWASA</option><option>ANAK</option></select></div>
+          <div class="col-md-4"><label class="form-label">Jenis Integrasi</label><input id="kf_jenis_integrasi" class="form-control" placeholder="PB / CB / CMB ..."></div>
+          <div class="col-md-4"><label class="form-label">PK Pembimbing</label><input id="kf_pk" class="form-control"></div>
+          <div class="col-md-4"><label class="form-label">Tanggal Penerimaan</label><input id="kf_tanggal_penerimaan" type="date" class="form-control"></div>
+          <div class="col-md-4"><label class="form-label">Tanggal Ekspirasi</label><input id="kf_tanggal_ekspirasi" type="date" class="form-control"></div>
+          <div class="col-md-6"><label class="form-label">Status</label><select id="kf_status_pembimbingan" class="form-select"><option value="">-</option><option>AKTIF</option><option>PENGAKHIRAN</option></select></div>
+          <div class="col-md-6"><label class="form-label">Daerah</label><input id="kf_daerah" class="form-control" placeholder="mis. Kab. Banyumas"></div>
         </div>
       </div>
       <div class="modal-footer">
@@ -1615,8 +1623,8 @@
 
 
   // ===== MODUL REGISTRASI: KLIEN =====
-  const KL_FIELDS = ['no_register','nik','nama','tanggal_lahir','agama','kewarganegaraan','pendidikan_terakhir','pekerjaan','status_pernikahan','alamat','no_hp','nama_penjamin','no_hp_penjamin','perkara','pasal','lama_pidana','asal_instansi'];
-  const KL_LABEL = { no_register:'No Register Klien', nik:'NIK', nama:'Nama Lengkap', tanggal_lahir:'Tanggal Lahir', agama:'Agama', kewarganegaraan:'Kewarganegaraan', pendidikan_terakhir:'Pendidikan Terakhir', pekerjaan:'Pekerjaan', status_pernikahan:'Status Pernikahan', alamat:'Alamat', no_hp:'No HP', nama_penjamin:'Nama Penjamin', no_hp_penjamin:'No HP Penjamin', perkara:'Perkara Tindak Pidana', pasal:'Pasal Pelanggaran', lama_pidana:'Lama Pidana', asal_instansi:'Asal Instansi' };
+  const KL_FIELDS = ['no_register','nik','nama','tanggal_lahir','agama','kewarganegaraan','pendidikan_terakhir','pekerjaan','status_pernikahan','alamat','no_hp','nama_penjamin','no_hp_penjamin','perkara','pasal','lama_pidana','asal_instansi','jenis_kelamin','pk','jenis_integrasi','kategori','tanggal_penerimaan','tanggal_ekspirasi','status_pembimbingan','daerah'];
+  const KL_LABEL = { no_register:'No Register Klien', nik:'NIK', nama:'Nama Lengkap', tanggal_lahir:'Tanggal Lahir', agama:'Agama', kewarganegaraan:'Kewarganegaraan', pendidikan_terakhir:'Pendidikan Terakhir', pekerjaan:'Pekerjaan', status_pernikahan:'Status Pernikahan', alamat:'Alamat', no_hp:'No HP', nama_penjamin:'Nama Penjamin', no_hp_penjamin:'No HP Penjamin', perkara:'Perkara Tindak Pidana', pasal:'Pasal Pelanggaran', lama_pidana:'Lama Pidana', asal_instansi:'Asal Instansi', jenis_kelamin:'Jenis Kelamin', pk:'PK Pembimbing', jenis_integrasi:'Jenis Integrasi', kategori:'Anak/Dewasa', tanggal_penerimaan:'Tanggal Penerimaan', tanggal_ekspirasi:'Tanggal Ekspirasi', status_pembimbingan:'Status', daerah:'Daerah' };
   let allKlien = [], klCanManage = false, kfFoto = undefined, klCurrentId = null;
   const KL_FOTO_DEFAULT = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 120"><rect width="90" height="120" fill="#ced4da"/><circle cx="45" cy="45" r="20" fill="#fff"/><path d="M10 120c0-26 15-40 35-40s35 14 35 40z" fill="#fff"/></svg>');
   const fmtTgl = t => t ? new Date(t + 'T00:00:00').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-';
@@ -1751,6 +1759,7 @@
           ${sec('Data Pribadi', row('NIK', k.nik) + row('Tanggal Lahir', k.tanggal_lahir ? fmtTgl(k.tanggal_lahir) : '') + row('Agama', k.agama) + row('Kewarganegaraan', k.kewarganegaraan) + row('Pendidikan Terakhir', k.pendidikan_terakhir) + row('Pekerjaan', k.pekerjaan) + row('Status Pernikahan', k.status_pernikahan))}
           ${sec('Kontak', row('Alamat', k.alamat) + row('No HP', k.no_hp) + row('Nama Penjamin', k.nama_penjamin) + row('No HP Penjamin', k.no_hp_penjamin))}
           ${sec('Perkara', row('Perkara Tindak Pidana', k.perkara) + row('Pasal Pelanggaran', k.pasal) + row('Lama Pidana', k.lama_pidana) + row('Asal Instansi', k.asal_instansi) + row('UPT', k.upt ? k.upt.nama : ''))}
+          ${sec('Pembimbingan', row('Jenis Kelamin', k.jenis_kelamin) + row('Anak/Dewasa', k.kategori) + row('PK Pembimbing', k.pk) + row('Jenis Integrasi', k.jenis_integrasi) + row('Tanggal Penerimaan', k.tanggal_penerimaan ? fmtTgl(k.tanggal_penerimaan) : '') + row('Tanggal Ekspirasi', k.tanggal_ekspirasi ? fmtTgl(k.tanggal_ekspirasi) : '') + row('Status', k.status_pembimbingan) + row('Daerah', k.daerah))}
         </div></div></div></div>`;
     });
   }

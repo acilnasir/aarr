@@ -1446,6 +1446,8 @@ const KLIEN_FIELDS = [
   "no_register", "nik", "nama", "tanggal_lahir", "agama", "kewarganegaraan",
   "pendidikan_terakhir", "pekerjaan", "status_pernikahan", "alamat", "no_hp",
   "nama_penjamin", "no_hp_penjamin", "perkara", "pasal", "lama_pidana", "asal_instansi",
+  "jenis_kelamin", "pk", "jenis_integrasi", "kategori", "tanggal_penerimaan", "tanggal_ekspirasi",
+  "status_pembimbingan", "daerah",
 ] as const;
 const KLIEN_LIST_COLS = "id, upt_id, " + KLIEN_FIELDS.join(", ") + ", upt:upt_id(nama)";
 const MAX_KLIEN_FOTO_LENGTH = 200_000;
@@ -1476,6 +1478,9 @@ function cleanKlien(payload: Record<string, unknown>, partialFoto: boolean) {
   if (rec.nik && !/^\d{16}$/.test(rec.nik as string)) return { error: "NIK harus 16 digit angka." };
   if (rec.tanggal_lahir && !/^\d{4}-\d{2}-\d{2}$/.test(rec.tanggal_lahir as string)) {
     return { error: "Format tanggal lahir tidak valid." };
+  }
+  for (const f of ["tanggal_penerimaan", "tanggal_ekspirasi"]) {
+    if (rec[f] && !/^\d{4}-\d{2}-\d{2}$/.test(rec[f] as string)) return { error: `Format ${f} tidak valid.` };
   }
   const foto = payload?.foto;
   if (foto !== undefined) {
