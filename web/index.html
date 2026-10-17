@@ -570,13 +570,17 @@
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
         <h5 class="m-0">Pelacakan Klien <small class="text-muted fs-6" id="plCount"></small></h5>
         <div class="d-flex gap-2">
+          <select id="plMode" class="form-select form-select-sm w-auto" onchange="ubahModePelacakan()" title="Sumber lokasi klien">
+            <option value="lapor">Lokasi terakhir melapor</option>
+            <option value="alamat">Koordinat alamat registrasi</option>
+          </select>
           <button class="btn btn-sm btn-outline-primary" onclick="salinLinkPresensi()"><i class="bi bi-link-45deg"></i> Salin tautan presensi klien</button>
           <button class="btn btn-sm btn-outline-secondary" onclick="loadPelacakan()"><i class="bi bi-arrow-clockwise"></i> Muat ulang</button>
         </div>
       </div>
       <div class="row g-3">
         <div class="col-lg-8"><div id="plMap" style="height:440px;border-radius:8px;border:1px solid #dee2e6;"></div>
-          <div class="small text-muted mt-1"><span class="text-success">●</span> Dalam wilayah izin &nbsp; <span class="text-danger">●</span> Di luar wilayah &nbsp; <span class="text-primary">●</span> Tanpa batas wilayah &nbsp; <span class="text-secondary">●</span> Belum presensi (tidak tampil di peta)</div></div>
+          <div class="small text-muted mt-1"><span class="text-success">●</span> Dalam wilayah izin &nbsp; <span class="text-danger">●</span> Di luar wilayah &nbsp; <span class="text-primary">●</span> Tanpa batas wilayah &nbsp; <span class="text-secondary">●</span> Belum presensi (tidak tampil di peta) &nbsp; <span style="color:#fd7e14">●</span> Alamat registrasi</div></div>
         <div class="col-lg-4">
           <input type="search" id="plSearch" class="form-control form-control-sm mb-2" placeholder="Cari nama / no register..." oninput="renderPelacakanList()">
           <div id="plList" class="list-group" style="max-height:440px;overflow:auto;"></div>
@@ -1765,7 +1769,7 @@
   }
 
   // ---------------- PENGAWASAN: PELACAKAN KLIEN ----------------
-  let plMap = null, plLayer = null, plData = [], plSel = null, plCanManage = false;
+  let plMap = null, plLayer = null, plData = [], plSel = null, plCanManage = false, plAlamatMarker = null;
 
   function hitungJarakKm(a, b, c, d) {
     const R = 6371, rad = x => x * Math.PI / 180, dLa = rad(c - a), dLo = rad(d - b);
@@ -1781,6 +1785,62 @@
   const PL_WARNA = { dalam: '#198754', luar: '#dc3545', bebas: '#0d6efd', belum: '#6c757d' };
   const PL_LABEL = { dalam: 'Dalam wilayah izin', luar: 'DI LUAR wilayah izin', bebas: 'Tanpa batas wilayah', belum: 'Belum presensi' };
   const fmtWaktuPl = t => t ? new Date(t).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+
+  // Geocoding alamat registrasi (OpenStreetMap Nominatim), di-cache di browser.
+  const plGeoCache = (() => { try { return JSON.parse(localStorage.getItem('plGeo') || '{}'); } catch (e) { return {}; } })();
+  let plGeoLast = 0;
+  async function geocodeAlamat(k) {
+    const dasar = String(k.alamat || '').replace(/\s+/g, ' ').trim();
+    if (!dasar) return null;
+    const key = k.id + '|' + dasar + '|' + (k.daerah || '');
+    if (key in plGeoCache) return plGeoCache[key];
+    const bagian = dasar.split(/[,;]/).map(x => x.trim()).filter(Boolean);
+    const upt = k.upt && k.upt.nama ? k.upt.nama.replace(/^Bapas\s+(Kelas\s+\w+\s+)?/i, '') : '';
+    const kandidat = [];
+    for (let i = 0; i < bagian.length && i < 4; i++) {
+      const q = bagian.slice(i).join(', ');
+      kandidat.push(q + (k.daerah ? ', ' + k.daerah : '') + ', Indonesia');
+      if (upt) kandidat.push(q + ', ' + upt + ', Indonesia');
+    }
+    kandidat.push(dasar + ', Indonesia');
+    let hasil = null;
+    for (const q of [...new Set(kandidat)]) {
+      const tunggu = 1100 - (Date.now() - plGeoLast);
+      if (tunggu > 0) await new Promise(r => setTimeout(r, tunggu));
+      plGeoLast = Date.now();
+      try {
+        const r = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=id&q=' + encodeURIComponent(q));
+        const j = await r.json();
+        if (j && j[0]) { hasil = { lat: parseFloat(j[0].lat), lng: parseFloat(j[0].lon), q }; break; }
+      } catch (e) { return undefined; }
+    }
+    plGeoCache[key] = hasil;
+    try { localStorage.setItem('plGeo', JSON.stringify(plGeoCache)); } catch (e) {}
+    return hasil;
+  }
+
+  function plModeAlamat() { return document.getElementById('plMode').value === 'alamat'; }
+
+  function ubahModePelacakan() {
+    if (plAlamatMarker) { plAlamatMarker.remove(); plAlamatMarker = null; }
+    renderPelacakan(!plModeAlamat());
+    if (plSel) bukaDetailPelacakan(plSel, true);
+  }
+
+  async function tampilAlamatDiPeta(k) {
+    const info = document.getElementById('plAlamatInfo');
+    if (info) info.innerHTML = '<span class="text-muted">Mencari koordinat alamat...</span>';
+    const g = await geocodeAlamat(k);
+    if (plSel !== k.id) return;
+    if (plAlamatMarker) { plAlamatMarker.remove(); plAlamatMarker = null; }
+    const el = document.getElementById('plAlamatInfo');
+    if (g === undefined) { if (el) el.innerHTML = '<span class="text-danger">Layanan peta tidak dapat dihubungi.</span>'; return; }
+    if (!g) { if (el) el.innerHTML = '<span class="text-danger">Koordinat alamat tidak ditemukan. Lengkapi alamat di data registrasi klien.</span>'; return; }
+    plAlamatMarker = L.circleMarker([g.lat, g.lng], { radius: 10, color: '#fff', weight: 2, fillColor: '#fd7e14', fillOpacity: 1 })
+      .bindTooltip(escHtml(k.nama) + ' (alamat registrasi)').addTo(plMap);
+    plMap.setView([g.lat, g.lng], 15);
+    if (el) el.innerHTML = `${g.lat.toFixed(6)}, ${g.lng.toFixed(6)} <a target="_blank" rel="noopener" href="https://www.google.com/maps?q=${g.lat},${g.lng}">Buka di Google Maps</a><br><small class="text-muted">Perkiraan dari alamat (hasil pencarian: ${escHtml(g.q)})</small>`;
+  }
 
   function salinLinkPresensi() {
     const url = new URL('presensi.html', location.href).href;
@@ -1810,7 +1870,7 @@
       if (k.lat_pusat != null && k.long_pusat != null && k.radius_km) {
         L.circle([k.lat_pusat, k.long_pusat], { radius: k.radius_km * 1000, color: PL_WARNA[st === 'belum' ? 'bebas' : st], weight: 1, fillOpacity: 0.05, interactive: false }).addTo(plLayer);
       }
-      if (!t) return;
+      if (!t || plModeAlamat()) return;
       pts.push([t.latitude, t.longitude]);
       L.circleMarker([t.latitude, t.longitude], { radius: 9, color: '#fff', weight: 2, fillColor: PL_WARNA[st], fillOpacity: 1 })
         .bindTooltip(`${escHtml(k.nama)} (${escHtml(k.no_register)})`).on('click', () => bukaDetailPelacakan(k.id, true)).addTo(plLayer);
@@ -1839,7 +1899,7 @@
     if (!k) return;
     renderPelacakanList();
     const t = k.terakhir, st = plStatus(k, t);
-    if (fokus && t) plMap.setView([t.latitude, t.longitude], Math.max(plMap.getZoom(), 15));
+    if (fokus && t && !plModeAlamat()) plMap.setView([t.latitude, t.longitude], Math.max(plMap.getZoom(), 15));
     const box = document.getElementById('plDetail');
     const jarak = t && st !== 'bebas' && st !== 'belum' ? hitungJarakKm(k.lat_pusat, k.long_pusat, t.latitude, t.longitude).toFixed(2) + ' km dari titik pusat' : '';
     box.innerHTML = `<div class="card"><div class="card-body">
@@ -1857,6 +1917,7 @@
             <tr><th class="text-muted">Pekerjaan</th><td>${escHtml(t.pekerjaan || '-')}</td></tr>
             <tr><th class="text-muted">Alamat domisili</th><td>${escHtml(t.alamat_domisili || '-')}</td></tr>
             <tr><th class="text-muted">Kendala</th><td>${escHtml(t.kendala || '-')}</td></tr></tbody></table>` : ''}
+          <div class="small mb-1"><b>Alamat registrasi:</b> ${escHtml(k.alamat || '-')}<div id="plAlamatInfo" class="mt-1">${plModeAlamat() ? '' : `<button class="btn btn-sm btn-outline-warning py-0" onclick="document.getElementById('plMode').value='alamat';ubahModePelacakan()"><i class="bi bi-geo-alt"></i> Lihat koordinat alamat</button>`}</div></div>
           <div class="small"><b>Wilayah izin:</b> ${escHtml(k.wilayah_izin || '-')}${k.radius_km ? ` (pusat ${k.lat_pusat}, ${k.long_pusat}; radius ${k.radius_km} km)` : ' (belum ada batas radius)'}
             ${plCanManage ? ` <button class="btn btn-sm btn-outline-secondary py-0" onclick="aturWilayahKlien('${k.id}')"><i class="bi bi-pencil"></i> Atur</button>` : ''}</div>
         </div>
@@ -1877,6 +1938,7 @@
         return `<tr><td class="text-nowrap">${fmtWaktuPl(p.waktu)}</td><td><a target="_blank" rel="noopener" href="https://www.google.com/maps?q=${p.latitude},${p.longitude}">${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}</a></td><td>${escHtml(p.pekerjaan || '-')}</td><td>${escHtml(p.kendala || '-')}</td><td><span style="color:${PL_WARNA[s2]}">●</span> ${PL_LABEL[s2]}</td></tr>`;
       }).join('')}</tbody></table>` : 'Belum ada riwayat.';
     });
+    if (plModeAlamat()) tampilAlamatDiPeta(k);
     box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
