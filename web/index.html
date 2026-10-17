@@ -1871,7 +1871,7 @@
   function turunkanFilterPl(k) {
     const a = (k.alamat || '').split('/')[0];
     const cari = re => { const m = a.match(re); return m ? plTitle(m[1]) : ''; };
-    const stop = '(?=\\s*(?:,|\\.|\\bKec\\b|\\bKab\\b|\\bKota\\b|\\bRT\\b|\\bRW\\b|\\bDsn\\b|\\bDusun\\b|\\bProv\\b|$))';
+    const stop = '(?=\\s*(?:,|\\.|\\bKec\\b|\\bKab\\b|\\bKabupaten\\b|\\bKota\\b|\\bKodya\\b|\\bKotamadya\\b|\\bKota Madya\\b|\\bProvinsi\\b|\\bJl\\b|\\bJalan\\b|\\bLingkungan\\b|\\bKampung\\b|\\bKp\\b|\\bDukuh\\b|\\bRT\\b|\\bRW\\b|\\bDsn\\b|\\bDusun\\b|\\bProv\\b|$))';
     k._kel = cari(new RegExp('\\b(?:Desa|Ds|Kelurahan|Kel)\\b\\.?\\s+([A-Za-z\' \\-]+?)' + stop, 'i'));
     k._kec = cari(new RegExp('\\b(?:Kecamatan|Kec)\\b\\.?\\s+([A-Za-z\' \\-]+?)' + stop, 'i'));
     if (!k._kec && !k._kel && a && !/[,\d]/.test(a)) k._kec = plTitle(a);
